@@ -1,0 +1,72 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /customers/{uid} {
+      
+      allow read, create: if request.auth.uid == uid;
+      // Permite actualizarea documentului existent dacă UID-ul este același
+      allow update: if request.auth.uid == uid;
+
+      match /checkout_sessions/{id} {
+        allow read, write: if request.auth.uid == uid;
+      }
+      match /subscriptions/{id} {
+        allow read: if request.auth.uid == uid;
+      }
+      match /payments/{id} {
+        allow read: if request.auth.uid == uid;
+      }
+    }
+    
+    // Reguli pentru colecția roadmaps
+    match /roadmaps/{id} {
+      // Oricine poate citi roadmap-urile (vom filtra după userId în aplicație)
+      allow read: if request.auth != null;
+      
+      // Doar utilizatorul autentificat poate crea un roadmap cu userId-ul său
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      
+      // Proprietarul SAU administratorii pot actualiza roadmap-ul
+      allow update, delete: if request.auth != null && 
+                   (resource.data.userId == request.auth.uid || 
+                    get(/databases/$(database)/documents/customers/$(request.auth.uid)).data.role == 'admin' ||
+                    get(/databases/$(database)/documents/customers/$(request.auth.uid)).data.roles.hasAny(['admin']));
+    }
+    
+    // Reguli pentru colecția paths
+    match /paths/{id} {
+      // Oricine autentificat poate citi pathurile
+      allow read: if request.auth != null;
+      
+      // Doar utilizatorul autentificat poate crea un path cu userId-ul său
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      
+      // Doar proprietarul poate actualiza sau șterge path-ul
+      allow update, delete: if request.auth != null && 
+                           (resource.data.userId == request.auth.uid);
+    }
+    
+    // Reguli pentru colecția feedback
+    match /feedback/{id} {
+      // Oricine autentificat poate citi și crea feedback
+      allow read, create: if request.auth != null;
+
+      // Administratorii pot actualiza și șterge feedback-urile
+      allow update, delete: if request.auth != null && 
+                             (get(/databases/$(database)/documents/customers/$(request.auth.uid)).data.role == 'admin' || 
+                              get(/databases/$(database)/documents/customers/$(request.auth.uid)).data.roles.hasAny(['admin']));
+    }
+
+    match /products/{id} {
+      allow read: if true;
+
+      match /prices/{id} {
+        allow read: if true;
+      }
+
+      match /tax_rates/{id} {
+        allow read: if true;
+      }
+    }
+  }
+}
