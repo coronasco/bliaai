@@ -7,7 +7,7 @@ import { checkUserPermissions } from "@/lib/adminUtils";
  */
 export async function GET(
   req: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<Response> {
   try {
     // Verificăm autorizarea (token-ul din header)
@@ -24,7 +24,7 @@ export async function GET(
     await verifyIdToken(token);
 
     // Obținem ID-ul documentului din URL
-    const docId = context.params.id;
+    const { id: docId } = await params;
     if (!docId) {
       return NextResponse.json(
         { error: "Document ID is required" },
@@ -64,7 +64,7 @@ export async function GET(
  */
 export async function PUT(
   req: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<Response> {
   try {
     // Verificăm autorizarea (token-ul din header)
@@ -90,7 +90,7 @@ export async function PUT(
     }
 
     // Obținem ID-ul documentului din URL
-    const docId = context.params.id;
+    const { id: docId } = await params;
     if (!docId) {
       return NextResponse.json(
         { error: "Document ID is required" },
@@ -168,7 +168,7 @@ export async function PUT(
  */
 export async function DELETE(
   req: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<Response> {
   try {
     // Verificăm autorizarea (token-ul din header)
@@ -194,7 +194,7 @@ export async function DELETE(
     }
 
     // Obținem ID-ul documentului din URL
-    const docId = context.params.id;
+    const { id: docId } = await params;
     if (!docId) {
       return NextResponse.json(
         { error: "Document ID is required" },
