@@ -22,6 +22,7 @@ import {
   FaBug,
   FaExternalLinkAlt,
   FaCheck,
+  FaBookReader,
 } from "react-icons/fa";
 import { MainTaskType } from "@/lib/openai";
 import { toast } from "sonner";
@@ -487,6 +488,22 @@ const CareerRoadmap = ({
                               {subtask.description ? (
                                 <div className="prose prose-sm prose-invert max-w-none pl-7 markdown-content">
                                   {renderMarkdown(subtask.description.replace(/\\n/g, '\n').replace(/(?<!\n)\n(?!\n)/g, '\n\n'))}
+                                  
+                                  {/* Tutorials - Coming Soon Section */}
+                                  <div className="mt-4 border border-indigo-800/30 bg-indigo-900/20 rounded-md p-3">
+                                    <div className="flex items-center justify-between">
+                                      <h5 className="text-sm font-medium text-indigo-300 flex items-center">
+                                        <FaBookReader className="mr-1.5 h-3.5 w-3.5" />
+                                        Tutorials
+                                      </h5>
+                                      <span className="text-xs bg-indigo-900/40 text-indigo-300 py-0.5 px-1.5 rounded">
+                                        Coming soon
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-gray-400 mt-1">
+                                      Interactive tutorials for this subtask will be available soon. These custom-made lessons will provide step-by-step guidance to help you master this skill.
+                                    </p>
+                                  </div>
                                   
                                   {/* Resources */}
                                   {subtask.resources && subtask.resources.length > 0 && (
