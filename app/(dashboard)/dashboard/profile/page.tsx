@@ -764,41 +764,156 @@ export default function ProfilePage() {
                       </div>
                       <div>
                         <h4 className="text-white font-medium">Standard Account</h4>
-                        <p className="text-gray-400 text-sm">You don&apos;t have an active premium subscription.</p>
+                        <p className="text-gray-400 text-sm">You currently have a standard account with limited features.</p>
                       </div>
                     </div>
                   </div>
                   
-                  <div className="p-6 bg-gradient-to-r from-indigo-900/30 to-purple-900/30 border border-indigo-800/30 rounded-lg">
-                    <h4 className="font-medium mb-4 flex items-center text-white">
-                      <FaCrown className="text-yellow-500 mr-2" /> Premium Benefits
-                    </h4>
-                    <ul className="space-y-3 text-sm">
-                      <li className="flex items-start">
-                        <CheckCircle className="text-green-500 mr-2 mt-0.5 h-4 w-4 flex-shrink-0" />
-                        <span className="text-gray-300">Unlimited access to AI-generated career paths</span>
-                      </li>
-                      <li className="flex items-start">
-                        <CheckCircle className="text-green-500 mr-2 mt-0.5 h-4 w-4 flex-shrink-0" />
-                        <span className="text-gray-300">Advanced skills assessment and personalized recommendations</span>
-                      </li>
-                      <li className="flex items-start">
-                        <CheckCircle className="text-green-500 mr-2 mt-0.5 h-4 w-4 flex-shrink-0" />
-                        <span className="text-gray-300">Premium badges and exclusive content</span>
-                      </li>
-                      <li className="flex items-start">
-                        <CheckCircle className="text-green-500 mr-2 mt-0.5 h-4 w-4 flex-shrink-0" />
-                        <span className="text-gray-300">Priority support and early access to new features</span>
-                      </li>
-                    </ul>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {/* Standard Plan */}
+                    <div className="p-6 bg-gradient-to-r from-gray-800/80 to-gray-700/80 border border-gray-700/80 rounded-lg relative overflow-hidden">
+                      <div className="absolute inset-0 bg-[url('/images/mesh-pattern.png')] opacity-5"></div>
+                      
+                      <h4 className="font-medium mb-4 flex items-center text-white text-lg relative z-10">
+                        <User className="text-gray-400 mr-2 h-5 w-5" /> Standard Plan
+                        <Badge className="ml-2 bg-gray-700 text-gray-300">Current</Badge>
+                      </h4>
+                      
+                      <p className="text-gray-400 mb-5 relative z-10 text-sm">Basic access to career planning tools.</p>
+                      
+                      <ul className="space-y-3 text-sm relative z-10 mb-6">
+                        <li className="flex items-start">
+                          <CheckCircle className="text-green-500 mr-2 mt-0.5 h-4 w-4 flex-shrink-0" />
+                          <span className="text-gray-300">Access to 1 career roadmap</span>
+                        </li>
+                        <li className="flex items-start">
+                          <CheckCircle className="text-green-500 mr-2 mt-0.5 h-4 w-4 flex-shrink-0" />
+                          <span className="text-gray-300">View public roadmaps</span>
+                        </li>
+                        <li className="flex items-start">
+                          <CheckCircle className="text-green-500 mr-2 mt-0.5 h-4 w-4 flex-shrink-0" />
+                          <span className="text-gray-300">Basic progress tracking</span>
+                        </li>
+                        <li className="flex items-start opacity-50">
+                          <X className="text-red-500 mr-2 mt-0.5 h-4 w-4 flex-shrink-0" />
+                          <span className="text-gray-300">Generate personalized roadmaps</span>
+                        </li>
+                        <li className="flex items-start opacity-50">
+                          <X className="text-red-500 mr-2 mt-0.5 h-4 w-4 flex-shrink-0" />
+                          <span className="text-gray-300">Generate details for subtasks</span>
+                        </li>
+                        <li className="flex items-start opacity-50">
+                          <X className="text-red-500 mr-2 mt-0.5 h-4 w-4 flex-shrink-0" />
+                          <span className="text-gray-300">Multiple roadmaps (up to 4)</span>
+                        </li>
+                        <li className="flex items-start opacity-50">
+                          <X className="text-red-500 mr-2 mt-0.5 h-4 w-4 flex-shrink-0" />
+                          <span className="text-gray-300">Premium badges and exclusive rewards</span>
+                        </li>
+                      </ul>
+                      
+                      <div className="text-center relative z-10">
+                        <span className="text-gray-400 text-sm block mb-2">Free</span>
+                      </div>
+                    </div>
                     
-                    <Button 
-                      className="w-full mt-5 bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-white border-0" 
-                      onClick={() => router.push("/premium")}
-                    >
-                      <FaCrown className="mr-2" />
-                      Upgrade to Premium
-                    </Button>
+                    {/* Premium Plan */}
+                    <div className="p-6 bg-gradient-to-r from-indigo-900/30 to-purple-900/30 border border-indigo-800/40 rounded-lg relative overflow-hidden">
+                      <div className="absolute inset-0 bg-[url('/images/mesh-pattern.png')] opacity-10"></div>
+                      <div className="absolute top-0 right-0 transform translate-x-4 -translate-y-4">
+                        <div className="w-28 h-28 bg-purple-500/20 rounded-full filter blur-2xl"></div>
+                      </div>
+                      
+                      <h4 className="font-medium mb-4 flex items-center text-white text-lg relative z-10">
+                        <FaCrown className="text-yellow-500 mr-2 h-5 w-5" /> Premium Plan
+                        <Badge className="ml-2 bg-gradient-to-r from-yellow-500/20 to-amber-500/20 text-yellow-300 border-yellow-500/30">Recommended</Badge>
+                      </h4>
+                      
+                      <p className="text-gray-400 mb-5 relative z-10 text-sm">Full access to all features and premium content.</p>
+                      
+                      <ul className="space-y-3 text-sm relative z-10 mb-6">
+                        <li className="flex items-start">
+                          <CheckCircle className="text-green-500 mr-2 mt-0.5 h-4 w-4 flex-shrink-0" />
+                          <span className="text-gray-300">Create up to 4 career roadmaps</span>
+                        </li>
+                        <li className="flex items-start">
+                          <CheckCircle className="text-green-500 mr-2 mt-0.5 h-4 w-4 flex-shrink-0" />
+                          <span className="text-gray-300">Generate personalized roadmaps with AI</span>
+                        </li>
+                        <li className="flex items-start">
+                          <CheckCircle className="text-green-500 mr-2 mt-0.5 h-4 w-4 flex-shrink-0" />
+                          <span className="text-gray-300">Generate details for each subtask</span>
+                        </li>
+                        <li className="flex items-start">
+                          <CheckCircle className="text-green-500 mr-2 mt-0.5 h-4 w-4 flex-shrink-0" />
+                          <span className="text-gray-300">Skill assessments and personalized recommendations</span>
+                        </li>
+                        <li className="flex items-start">
+                          <CheckCircle className="text-green-500 mr-2 mt-0.5 h-4 w-4 flex-shrink-0" />
+                          <span className="text-gray-300">Curated learning resources</span>
+                        </li>
+                        <li className="flex items-start">
+                          <CheckCircle className="text-green-500 mr-2 mt-0.5 h-4 w-4 flex-shrink-0" />
+                          <span className="text-gray-300">Premium badges and exclusive rewards</span>
+                        </li>
+                        <li className="flex items-start">
+                          <CheckCircle className="text-green-500 mr-2 mt-0.5 h-4 w-4 flex-shrink-0" />
+                          <span className="text-gray-300">Priority support</span>
+                        </li>
+                      </ul>
+                      
+                      <div className="text-center relative z-10">
+                        <div className="bg-gray-800/60 rounded-lg p-2 mb-4">
+                          <Tabs defaultValue="monthly" className="w-full">
+                            <TabsList className="grid w-full grid-cols-2 bg-gray-800/80">
+                              <TabsTrigger value="monthly" className="data-[state=active]:bg-indigo-600">Monthly</TabsTrigger>
+                              <TabsTrigger value="yearly" className="data-[state=active]:bg-indigo-600">
+                                Yearly
+                                <Badge className="ml-2 bg-yellow-500/20 text-yellow-300 border-yellow-500/30 text-xs">Save 17%</Badge>
+                              </TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="monthly" className="pt-2 pb-0">
+                              <div className="text-lg font-bold text-white">$9.99<span className="text-sm font-normal text-gray-400">/month</span></div>
+                              <p className="text-xs text-gray-400 mt-1">Billed monthly</p>
+                            </TabsContent>
+                            <TabsContent value="yearly" className="pt-2 pb-0">
+                              <div className="text-lg font-bold text-white">$99.9<span className="text-sm font-normal text-gray-400">/year</span></div>
+                              <p className="text-xs text-gray-400 mt-1">
+                                Billed annually
+                                <span className="text-green-400 ml-1">
+                                  (2 months free)
+                                </span>
+                              </p>
+                            </TabsContent>
+                          </Tabs>
+                        </div>
+                        
+                        <Button 
+                          className="w-full mt-2 bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-white border-0" 
+                          onClick={() => router.push("/premium")}
+                        >
+                          <FaCrown className="mr-2" />
+                          Upgrade to Premium
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="p-6 bg-gradient-to-r from-blue-900/20 to-cyan-900/20 border border-blue-800/30 rounded-lg">
+                    <div className="flex items-start gap-4">
+                      <div className="p-2 rounded-full bg-blue-500/20 flex-shrink-0">
+                        <FaRegBell className="h-5 w-5 text-blue-400" />
+                      </div>
+                      <div>
+                        <h4 className="font-medium mb-2 text-white">Why upgrade to Premium?</h4>
+                        <p className="text-gray-300 text-sm">
+                          Premium members enjoy full access to all platform features, including 
+                          AI-generated personalized roadmaps, detailed subtask information, and up to 4 
+                          career paths simultaneously. Upgrade today to accelerate your career growth 
+                          with our most powerful planning and learning tools.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, deleteDoc, updateDoc, addDoc, collection } from "firebase/firestore";
+import { doc, getDoc, deleteDoc, updateDoc, addDoc, collection, arrayUnion } from "firebase/firestore";
 import { toast } from "sonner";
 import { FaBriefcase, FaSuitcase, FaCommentDots } from "react-icons/fa";
 
@@ -30,10 +30,10 @@ type RoadmapGenerationOptions = {
 
 const DashboardPage = () => {
   const { user } = useAuth();
-  
-  const [loading, setLoading] = useState(true);
+  const [allRoadmaps, setAllRoadmaps] = useState<ExtendedRoadmapType[]>([]);
   const [currentRoadmap, setCurrentRoadmap] = useState<ExtendedRoadmapType | null>(null);
-  const [isPremium] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [isPremium, setIsPremium] = useState(false);
   const [showCareerCreation, setShowCareerCreation] = useState(false);
 
   // Funcție pentru a deschide modalul de creare carieră
@@ -46,102 +46,125 @@ const DashboardPage = () => {
     setShowCareerCreation(false);
   };
 
-  // Funcție pentru a actualiza roadmap-ul
-  const updateRoadmap = (roadmap: ExtendedRoadmapType | null) => {
-    setCurrentRoadmap(roadmap);
-    
-    // Actualizăm și în localStorage
-    if (roadmap) {
-      localStorage.setItem('currentRoadmap', JSON.stringify(roadmap));
-    } else {
-      // Dacă roadmap-ul este null, ștergem din localStorage
-      localStorage.removeItem('currentRoadmap');
-    }
-  };
-
-  // Încărcăm roadmap-ul din localStorage și din Firestore la pornirea aplicației
+  // Efect pentru a încărca toate roadmap-urile utilizatorului
   useEffect(() => {
-    const loadRoadmap = async () => {
+    let errorDisplayed = false; // Variabilă pentru a urmări dacă eroarea a fost deja afișată
+    
+    const loadRoadmaps = async () => {
+      if (!user?.uid) return;
+      
+      setLoading(true);
+
       try {
-        setLoading(true);
+        // Verify if the user is premium
+        const userDoc = await getDoc(doc(db, "customers", user.uid));
+        const premium = userDoc.exists() && userDoc.data()?.isPremium === true;
+        setIsPremium(premium);
         
-        if (!user) {
-          setLoading(false);
-          return;
+        // Get all the user's roadmaps
+        const response = await fetch(`/api/roadmap/list?userId=${user.uid}`);
+        
+        // Handle HTTP errors
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+          console.error("API Error:", errorData);
+          throw new Error(errorData.error || 'Could not load roadmaps');
         }
+
+        // Parse the response
+        const data = await response.json();
         
-        // Verificăm întâi dacă există un roadmap în Firestore pentru acest utilizator
-        try {
-          const userDocRef = doc(db, "customers", user.uid);
-          // Actualizăm ultima activitate a utilizatorului
-          await updateDoc(userDocRef, { lastActive: new Date() })
-            .catch(() => null); // Ignorăm erorile la actualizare
+        // Process roadmaps
+        if (data && Array.isArray(data.roadmaps)) {
+          const roadmaps = data.roadmaps as ExtendedRoadmapType[];
+          setAllRoadmaps(roadmaps);
           
-          // Încărcăm documentul utilizatorului
-          const userDocSnapshot = await getDoc(userDocRef);
+          // Find the active roadmap
+          const activeRoadmap = roadmaps.find(rm => rm.isActive) || (roadmaps.length > 0 ? roadmaps[0] : null);
           
-          if (userDocSnapshot.exists() && userDocSnapshot.data().roadmapId) {
-            // Avem un ID de roadmap, îl încărcăm din Firestore
-            const roadmapId = userDocSnapshot.data().roadmapId;
-            const roadmapDocRef = doc(db, "roadmaps", roadmapId);
-            const roadmapDoc = await getDoc(roadmapDocRef);
-            
-            if (roadmapDoc.exists()) {
-              const roadmapData = roadmapDoc.data();
-              
-              if (roadmapData.roadmap) {
-                // Asigurăm-ne că roadmap-ul include userId pentru a identifica proprietarul
-                const updatedRoadmap = {
-                  ...roadmapData.roadmap,
-                  userId: roadmapData.userId || user.uid,
-                  id: roadmapId
-                };
-                
-                setCurrentRoadmap(updatedRoadmap as ExtendedRoadmapType);
-                localStorage.setItem('currentRoadmap', JSON.stringify(updatedRoadmap));
-                setLoading(false);
-                return; // Roadmap încărcat cu succes, ieșim
-              }
-            }
-          }
-          
-          // Dacă nu am găsit un roadmap în Firestore sau nu există, încercăm localStorage
-          const savedRoadmap = localStorage.getItem('currentRoadmap');
-          if (savedRoadmap) {
-            const parsedRoadmap = JSON.parse(savedRoadmap) as ExtendedRoadmapType;
-            
-            // Verificăm dacă acest roadmap aparține utilizatorului curent
-            if (parsedRoadmap.userId && parsedRoadmap.userId !== user.uid) {
-              console.log("Roadmap-ul din localStorage aparține altui utilizator, nu-l încărcăm");
-              localStorage.removeItem('currentRoadmap');
-              setCurrentRoadmap(null);
-            } else {
-              // Asigurăm-ne că roadmap-ul include userId
-              const updatedRoadmap = {
-                ...parsedRoadmap,
-                userId: parsedRoadmap.userId || user.uid
-              };
-              setCurrentRoadmap(updatedRoadmap);
-              localStorage.setItem('currentRoadmap', JSON.stringify(updatedRoadmap));
-            }
+          if (activeRoadmap) {
+            // If an active roadmap is found, set it as the current roadmap
+            setCurrentRoadmap(activeRoadmap);
+          } else if (roadmaps.length > 0) {
+            // If no active roadmap exists but there are roadmaps, set the first one as active
+            await handleSetActiveRoadmap(roadmaps[0].id);
+            setCurrentRoadmap(roadmaps[0]);
           } else {
-            // Nu avem roadmap nici în Firestore, nici în localStorage
+            // No roadmaps found - make sure currentRoadmap is null
             setCurrentRoadmap(null);
           }
-        } catch (error) {
-          console.error("Error loading roadmap from Firestore:", error);
+        } else {
+          // No roadmaps in response or invalid data format
+          setAllRoadmaps([]);
           setCurrentRoadmap(null);
         }
       } catch (error) {
-        console.error("Error in roadmap loading process:", error);
+        console.error("Error loading roadmaps:", error);
+        setAllRoadmaps([]);
         setCurrentRoadmap(null);
+        
+        // Verificăm dacă eroarea a fost deja afișată
+        if (!errorDisplayed) {
+          errorDisplayed = true;
+          toast.error("Could not load roadmaps", {
+            description: "Please try again later. If the problem persists, contact support."
+          });
+        }
       } finally {
         setLoading(false);
       }
     };
     
-    loadRoadmap();
-  }, [user]); // Adăugăm user ca dependență pentru a reîncărca când se schimbă utilizatorul
+    loadRoadmaps();
+    
+    // Cleanup function will be called when the component unmounts
+    return () => {
+      errorDisplayed = true; // Prevent error toast if component unmounts during loading
+    };
+  }, [user]);
+  
+  // Funcție pentru a seta un roadmap ca activ
+  const handleSetActiveRoadmap = async (roadmapId: string): Promise<void> => {
+    if (!user?.uid || !roadmapId) return;
+    
+    try {
+      const response = await fetch('/api/roadmap/activate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          roadmapId,
+          userId: user.uid
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        console.error("API Error when activating roadmap:", errorData);
+        throw new Error(errorData.error || 'Could not activate roadmap');
+      }
+      
+      // Actualizăm starea locală
+      const updatedRoadmaps = allRoadmaps.map(rm => ({
+        ...rm,
+        isActive: rm.id === roadmapId
+      }));
+      
+      setAllRoadmaps(updatedRoadmaps);
+      
+      // Setăm roadmap-ul activ ca roadmap-ul curent
+      const activeRoadmap = updatedRoadmaps.find(rm => rm.id === roadmapId) || null;
+      if (activeRoadmap) {
+        setCurrentRoadmap(activeRoadmap);
+      }
+    } catch (error) {
+      console.error("Error activating roadmap:", error);
+      toast.error("Could not activate roadmap", {
+        description: "Please try again later. If the problem persists, contact support."
+      });
+    }
+  };
 
   // Funcție pentru gestionarea generării unui nou roadmap
   const handleGenerateRoadmap = async (experienceLevel: string, options?: RoadmapGenerationOptions) => {
@@ -177,30 +200,38 @@ const DashboardPage = () => {
           throw new Error('API response does not contain valid data');
         }
         
-        // Adăugăm userId la roadmap pentru a-l asocia cu utilizatorul curent
-        const roadmapWithUserId = {
+        // Adăugăm userId la roadmap și îl facem automat public
+        const roadmapWithMetadata = {
           ...roadmap,
-          userId: user.uid
+          userId: user.uid,
+          isPublic: true, // Toate roadmap-urile sunt acum public în mod implicit
+          creatorName: user.displayName || 'Anonymous',
+          creatorEmail: user.email || '',
+          createdAt: new Date(),
+          updatedAt: new Date()
         };
         
         // Actualizăm starea cu datele generate
-        setCurrentRoadmap(roadmapWithUserId as ExtendedRoadmapType);
+        setCurrentRoadmap(roadmapWithMetadata as ExtendedRoadmapType);
         
         // Salvăm roadmap-ul în localStorage pentru persistență
-        localStorage.setItem('currentRoadmap', JSON.stringify(roadmapWithUserId));
+        localStorage.setItem('currentRoadmap', JSON.stringify(roadmapWithMetadata));
         
         // Salvăm roadmap-ul în Firestore
         try {
           const roadmapDocRef = await addDoc(collection(db, "roadmaps"), {
             userId: user.uid,
-            roadmap: roadmapWithUserId,
+            roadmap: roadmapWithMetadata,
+            isPublic: true, // Adăugăm și la nivelul documentului
+            creatorName: user.displayName || 'Anonymous',
+            creatorEmail: user.email || '',
             createdAt: new Date(),
             updatedAt: new Date()
           });
           
           // Actualizăm roadmap-ul cu ID-ul din Firestore
           const roadmapWithId = {
-            ...roadmapWithUserId,
+            ...roadmapWithMetadata,
             id: roadmapDocRef.id
           };
           
@@ -211,7 +242,9 @@ const DashboardPage = () => {
           // Actualizăm profilul utilizatorului cu referința la noul roadmap
           const userDocRef = doc(db, "customers", user.uid);
           await updateDoc(userDocRef, {
-            roadmapId: roadmapDocRef.id
+            roadmapId: roadmapDocRef.id,
+            roadmaps: arrayUnion(roadmapDocRef.id), // Adăugăm într-un array de roadmap-uri
+            updatedAt: new Date()
           });
           
         } catch (firestoreError) {
@@ -262,6 +295,37 @@ const DashboardPage = () => {
       console.error("Error deleting roadmap:", error);
       toast.error("Could not delete the roadmap");
     }
+  };
+
+  // Funcție pentru a actualiza roadmap-ul
+  const updateRoadmap = (roadmap: ExtendedRoadmapType | null) => {
+    setCurrentRoadmap(roadmap);
+    
+    // Actualizăm și în allRoadmaps dacă există
+    if (roadmap) {
+      setAllRoadmaps(prev => {
+        const index = prev.findIndex(rm => rm.id === roadmap.id);
+        if (index !== -1) {
+          // Dacă roadmap-ul există, îl actualizăm
+          const updated = [...prev];
+          updated[index] = roadmap;
+          return updated;
+        } else {
+          // Dacă roadmap-ul nu există, îl adăugăm
+          return [...prev, roadmap];
+        }
+      });
+      
+      localStorage.setItem('currentRoadmap', JSON.stringify(roadmap));
+    } else {
+      // Dacă roadmap-ul este null, ștergem din localStorage
+      localStorage.removeItem('currentRoadmap');
+    }
+  };
+  
+  // Funcție pentru a actualiza lista de roadmap-uri
+  const updateAllRoadmaps = (roadmaps: ExtendedRoadmapType[]) => {
+    setAllRoadmaps(roadmaps);
   };
 
   return (
@@ -317,13 +381,16 @@ const DashboardPage = () => {
         <div className="md:col-span-2">
           <CareerRoadmap
             roadmap={currentRoadmap}
+            allRoadmaps={allRoadmaps}
             onlineStatus={true}
             isPremium={isPremium}
             handleGenerateRoadmap={handleGenerateRoadmap}
             handleOpenCreateCareer={openCareerCreation}
             setRoadmap={updateRoadmap as (roadmap: RoadmapType | null) => void}
+            setAllRoadmaps={updateAllRoadmaps as (roadmaps: RoadmapType[]) => void}
             handleDeleteRoadmap={currentRoadmap ? handleDeleteRoadmap : undefined}
             isOwner={currentRoadmap?.userId === user?.uid || !currentRoadmap?.userId}
+            handleSetActiveRoadmap={handleSetActiveRoadmap}
           />
         </div>
       </div>

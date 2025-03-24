@@ -20,8 +20,8 @@ service cloud.firestore {
     
     // Reguli pentru colecția roadmaps
     match /roadmaps/{id} {
-      // Oricine poate citi roadmap-urile (vom filtra după userId în aplicație)
-      allow read: if request.auth != null;
+      // Oricine poate citi roadmap-urile, chiar și utilizatorii neautentificați
+      allow read: if true;
       
       // Doar utilizatorul autentificat poate crea un roadmap cu userId-ul său
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
@@ -33,10 +33,19 @@ service cloud.firestore {
                     get(/databases/$(database)/documents/customers/$(request.auth.uid)).data.roles.hasAny(['admin']));
     }
     
+    // Reguli pentru colecția roadmap_clones
+    match /roadmap_clones/{id} {
+      // Oricine autentificat poate citi
+      allow read: if request.auth != null;
+      
+      // Doar utilizatorul autentificat poate crea o clonă
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+    
     // Reguli pentru colecția paths
     match /paths/{id} {
-      // Oricine autentificat poate citi pathurile
-      allow read: if request.auth != null;
+      // Oricine poate citi pathurile, chiar și utilizatorii neautentificați
+      allow read: if true;
       
       // Doar utilizatorul autentificat poate crea un path cu userId-ul său
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
