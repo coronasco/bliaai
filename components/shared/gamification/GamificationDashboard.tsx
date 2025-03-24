@@ -69,6 +69,18 @@ const GamificationDashboard: React.FC = () => {
       minute: '2-digit'
     }).format(date);
   };
+
+  // Function to translate achievement descriptions (for legacy Romanian text)
+  const translateAchievementDescription = (description: string): string => {
+    if (description.includes('Streak de')) {
+      // Replace the pattern "Streak de X zile consecutive" with "X day consecutive streak"
+      return description.replace(/Streak de (\d+) zile consecutive/, "$1 day consecutive streak");
+    }
+    if (description === 'Login zilnic') {
+      return 'Daily login';
+    }
+    return description;
+  };
   
   // Load gamification data
   useEffect(() => {
@@ -285,7 +297,7 @@ const GamificationDashboard: React.FC = () => {
                             {formatDate(achievement.timestamp)}
                           </div>
                         </div>
-                        <p className="text-sm text-gray-400 mt-1">{achievement.description}</p>
+                        <p className="text-sm text-gray-400 mt-1">{translateAchievementDescription(achievement.description)}</p>
                         <div className="mt-2 text-sm font-medium text-blue-400">+{achievement.points} points</div>
                       </div>
                     </div>

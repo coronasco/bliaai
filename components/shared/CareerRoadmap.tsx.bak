@@ -909,7 +909,19 @@ const CareerRoadmap = ({
                         });
                         
                         // Salvează actualizările în Firebase
-                        await saveRoadmapToFirebase(finalRoadmap, `Updated tutorial for subtask "${currentSubtask?.title || 'unknown'}"`);
+                        if (roadmap.id) {
+                          try {
+                            const roadmapRef = doc(db, "roadmaps", roadmap.id);
+                            await updateDoc(roadmapRef, {
+                              "roadmap": finalRoadmap,
+                              "updatedAt": new Date()
+                            });
+                            console.log(`Roadmap updated in Firebase for subtask "${currentSubtask?.title || 'unknown'}"`);
+                          } catch (firestoreError) {
+                            console.error("Error saving roadmap updates to Firebase:", firestoreError);
+                            toast.error("Generated details saved locally, but failed to update in the database");
+                          }
+                        }
                       }
                     }
                     
@@ -1625,7 +1637,20 @@ const CareerRoadmap = ({
           setRoadmap(updatedRoadmap);
           
           // Salvează actualizările în Firebase
-          await saveRoadmapToFirebase(updatedRoadmap, `Updated details for subtask "${subtaskTitle}"`);
+          if (roadmap.id) {
+            try {
+              const roadmapRef = doc(db, "roadmaps", roadmap.id);
+              await updateDoc(roadmapRef, {
+                "roadmap": updatedRoadmap,
+                "updatedAt": new Date()
+              });
+              console.log(`Roadmap updated in Firebase for subtask "${subtaskTitle}"`);
+              console.log(`Roadmap updated in Firebase for subtask "${currentSubtask?.title || 'unknown'}"`);
+            } catch (firestoreError) {
+              console.error("Error saving roadmap updates to Firebase:", firestoreError);
+              toast.error("Generated details saved locally, but failed to update in the database");
+            }
+          }
         }
       }
       

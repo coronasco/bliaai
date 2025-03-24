@@ -35,32 +35,33 @@ export function ConnectivityMonitor({
   );
   
   useEffect(() => {
-    // Funcții pentru gestionarea schimbărilor de conectivitate
+    // Handle when online status changes
     const handleOnline = () => {
       setIsOnline(true);
+      if (onStatusChange) onStatusChange(true);
+      
+      // Show a toast notification if enabled
       if (showToast) {
-        toast.success('Conexiunea la internet a fost restabilită');
-      }
-      if (onStatusChange) {
-        onStatusChange(true);
-      }
-    };
-
-    const handleOffline = () => {
-      setIsOnline(false);
-      if (showToast) {
-        toast.error('Conexiunea la internet a fost pierdută');
-      }
-      if (onStatusChange) {
-        onStatusChange(false);
+        toast.success('Internet connection has been restored');
       }
     };
     
-    // Adăugăm event listeners
+    // Handle when offline status changes
+    const handleOffline = () => {
+      setIsOnline(false);
+      if (onStatusChange) onStatusChange(false);
+      
+      // Show a toast notification if enabled
+      if (showToast) {
+        toast.error('Internet connection has been lost');
+      }
+    };
+    
+    // Add event listeners
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     
-    // Curățăm event listeners la unmount
+    // Clean up event listeners
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
@@ -74,10 +75,10 @@ export function ConnectivityMonitor({
           <AlertCircle className="h-4 w-4" />
           <AlertTitle className="flex items-center">
             <WifiOff className="mr-2 h-4 w-4" />
-            Mod offline
+            Offline Mode
           </AlertTitle>
           <AlertDescription>
-            Ești în modul offline. Unele funcționalități pot fi limitate. Datele vor fi sincronizate când conexiunea va fi restabilită.
+            You are in offline mode. Some features may be limited. Data will be synchronized when the connection is restored.
           </AlertDescription>
         </Alert>
       )}
@@ -97,10 +98,10 @@ export function OfflineWarning() {
       <AlertCircle className="h-4 w-4" />
       <AlertTitle className="flex items-center">
         <WifiOff className="mr-2 h-4 w-4" />
-        Mod offline
+        Offline Mode
       </AlertTitle>
       <AlertDescription>
-        Ești în modul offline. Unele funcționalități pot fi limitate. Datele vor fi sincronizate când conexiunea va fi restabilită.
+        You are in offline mode. Some features may be limited. Data will be synchronized when the connection is restored.
       </AlertDescription>
     </Alert>
   );
