@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { FaGoogle, FaLock, FaEnvelope, FaUser, FaArrowRight } from "react-icons/fa";
 import { toast } from "sonner";
+import Link from "next/link";
 
 export default function AuthPage() {
   const [email, setEmail] = useState("");
@@ -195,120 +196,81 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-white">
-      {/* Left side with image/illustration */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 to-indigo-800 p-12 flex-col justify-between relative overflow-hidden">
-        <div className="z-10">
-          <h1 className="text-4xl font-bold text-white mb-6">Welcome to BLia AI</h1>
-          <p className="text-blue-100 mb-6 text-lg">
-            Your educational AI platform to advance your career through personalized learning paths and skill assessments.
-          </p>
-          
-          <div className="space-y-4 mt-12">
-            <div className="flex items-start">
-              <div className="rounded-full bg-white/20 p-2 mr-4">
-                <FaUser className="text-white h-5 w-5" />
-              </div>
-              <div>
-                <h3 className="text-white font-medium">Personalized Learning</h3>
-                <p className="text-blue-100 text-sm">AI-generated career paths tailored to your needs and goals</p>
-              </div>
-            </div>
-            
-            <div className="flex items-start">
-              <div className="rounded-full bg-white/20 p-2 mr-4">
-                <FaLock className="text-white h-5 w-5" />
-              </div>
-              <div>
-                <h3 className="text-white font-medium">Premium Content</h3>
-                <p className="text-blue-100 text-sm">Exclusive resources and advanced features for subscribers</p>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Abstract background shapes */}
-        <div className="absolute bottom-0 left-0 right-0 top-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxkZWZzPjxwYXR0ZXJuIGlkPSJwYXR0ZXJuIiB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgcGF0dGVyblRyYW5zZm9ybT0icm90YXRlKDEwKSI+PHJlY3Qgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIiBmaWxsPSJyZ2JhKDI1NSwgMjU1LCAyNTUsIDAuMDMpIj48L3JlY3Q+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI3BhdHRlcm4pIj48L3JlY3Q+PC9zdmc+')] opacity-50 z-0"></div>
-        
-        <div className="z-10 text-white/40 text-sm">
-          © 2024 BLia AI. All rights reserved.
-        </div>
-      </div>
-      
-      {/* Right side with form */}
-      <div className="w-full lg:w-1/2 flex justify-center items-center p-8">
-        <Card className="w-full max-w-md border-none shadow-lg">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold text-center">
+    <div className="w-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-0">
+      {/* Left side with form */}
+      <div className="bg-gray-800 p-6 md:p-10 rounded-l-lg border border-gray-700">
+        <Card className="w-full border-gray-700 bg-gray-800 shadow-none">
+          <CardHeader className="space-y-2 pb-6 border-b border-gray-700">
+            <CardTitle className="text-2xl font-bold text-white text-center">
               {isRegister ? "Create an Account" : "Sign In to BLia AI"}
             </CardTitle>
-            <CardDescription className="text-center">
+            <CardDescription className="text-gray-300 text-center">
               {isRegister 
                 ? "Enter your information to create a new account" 
                 : "Enter your credentials to access your account"}
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={isRegister ? handleRegister : handleLogin} className="space-y-4">
+          <CardContent className="pt-6">
+            <form onSubmit={isRegister ? handleRegister : handleLogin} className="space-y-5">
               {isRegister && (
                 <div className="space-y-2">
-                  <div className="flex items-center">
-                    <FaUser className="text-gray-500 mr-2" />
-                    <label htmlFor="fullName" className="text-sm font-medium">
-                      Full Name
-                    </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
+                      <FaUser />
+                    </div>
+                    <Input
+                      id="fullName"
+                      type="text"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Full Name"
+                      required={isRegister}
+                      className="pl-10 bg-gray-700 border-gray-600 text-white focus:border-blue-500 focus:ring-blue-500"
+                      disabled={isLoading}
+                    />
                   </div>
-                  <Input
-                    id="fullName"
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="John Doe"
-                    required={isRegister}
-                    className="bg-gray-50 border border-gray-100"
-                  />
                 </div>
               )}
               
               <div className="space-y-2">
-                <div className="flex items-center">
-                  <FaEnvelope className="text-gray-500 mr-2" />
-                  <label htmlFor="email" className="text-sm font-medium">
-                    Email
-                  </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
+                    <FaEnvelope />
+                  </div>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Email address"
+                    required
+                    className="pl-10 bg-gray-700 border-gray-600 text-white focus:border-blue-500 focus:ring-blue-500"
+                    disabled={isLoading}
+                  />
                 </div>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="email@example.com"
-                  required
-                  className="bg-gray-50 border border-gray-100"
-                />
               </div>
               
               <div className="space-y-2">
-                <div className="flex items-center">
-                  <FaLock className="text-gray-500 mr-2" />
-                  <label htmlFor="password" className="text-sm font-medium">
-                    Password
-                  </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
+                    <FaLock />
+                  </div>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Password"
+                    required
+                    className="pl-10 bg-gray-700 border-gray-600 text-white focus:border-blue-500 focus:ring-blue-500"
+                    disabled={isLoading}
+                  />
                 </div>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  className="bg-gray-50 border border-gray-100"
-                />
               </div>
               
               <Button 
                 type="submit" 
-                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transition-all" 
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white" 
                 disabled={isLoading}
               >
                 {isLoading ? "Processing..." : isRegister ? "Create Account" : "Sign In"}
@@ -319,10 +281,10 @@ export default function AuthPage() {
             <div className="mt-6">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-200"></div>
+                  <div className="w-full border-t border-gray-700"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                  <span className="px-2 bg-gray-800 text-gray-400">Or continue with</span>
                 </div>
               </div>
               
@@ -330,28 +292,76 @@ export default function AuthPage() {
                 <Button 
                   type="button" 
                   variant="outline" 
-                  className="w-full border-gray-200 hover:bg-gray-50 transition-all" 
+                  className="w-full border-gray-600 text-gray-200 hover:bg-gray-700" 
                   onClick={handleGoogleAuth}
                   disabled={isLoading}
                 >
-                  <FaGoogle className="mr-2 text-red-500" />
+                  <FaGoogle className="mr-2 text-red-400" />
                   {isRegister ? "Sign up with Google" : "Sign in with Google"}
                 </Button>
               </div>
             </div>
           </CardContent>
-          <CardFooter>
+          <CardFooter className="flex flex-col space-y-4 border-t border-gray-700 pt-4">
             <Button
               variant="link"
-              className="w-full text-blue-600"
+              className="w-full text-blue-400 hover:text-blue-300"
               onClick={() => setIsRegister(!isRegister)}
             >
               {isRegister
                 ? "Already have an account? Sign in"
-                : "Don't have an account? Create one"}
+                : "Don&apos;t have an account? Create one"}
             </Button>
+            
+            {!isRegister && (
+              <div className="text-center">
+                <Button 
+                  variant="link" 
+                  className="text-sm text-gray-400 hover:text-blue-400"
+                  asChild
+                >
+                  <Link href="/forgot-password">Forgot your password?</Link>
+                </Button>
+              </div>
+            )}
           </CardFooter>
         </Card>
+      </div>
+      
+      {/* Right side with info */}
+      <div className="hidden lg:block bg-gray-900 p-10 rounded-r-lg border border-gray-700">
+        <div className="h-full flex flex-col justify-center">
+          <h2 className="text-3xl font-bold text-white mb-4">Welcome to BLia AI</h2>
+          <p className="text-gray-300 mb-8">
+            Your educational AI platform to advance your career through personalized learning paths and skill assessments.
+          </p>
+          
+          <div className="space-y-6">
+            <div className="flex items-start">
+              <div className="rounded-full bg-blue-600/20 p-3 mr-4">
+                <FaUser className="text-blue-400 h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-white font-medium">Personalized Learning</h3>
+                <p className="text-gray-400 mt-1">AI-generated career paths tailored to your needs and goals</p>
+              </div>
+            </div>
+            
+            <div className="flex items-start">
+              <div className="rounded-full bg-blue-600/20 p-3 mr-4">
+                <FaLock className="text-blue-400 h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-white font-medium">Premium Content</h3>
+                <p className="text-gray-400 mt-1">Exclusive resources and advanced features for subscribers</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-auto pt-8 text-gray-500 text-sm">
+            <p>© 2024 BLia AI. Secure login powered by Firebase Authentication.</p>
+          </div>
+        </div>
       </div>
     </div>
   );

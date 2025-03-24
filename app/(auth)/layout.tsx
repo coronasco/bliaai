@@ -9,7 +9,7 @@ export default function AuthLayout({
   return (
     <>
       <AuthRedirect />
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-green-50 to-white p-4">
+      <div className="min-h-screen w-full flex items-center justify-center bg-gray-900 text-white">
         {children}
       </div>
     </>
