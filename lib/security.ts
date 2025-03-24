@@ -3,7 +3,7 @@
  */
 
 import { auth, db } from './firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { User } from 'firebase/auth';
 
 /**
@@ -40,11 +40,30 @@ export const isPremiumUser = async (user: User | null): Promise<boolean> => {
   if (!user) return false;
   
   try {
-    const userDoc = await getDoc(doc(db, 'customers', user.uid));
+    const userDocRef = doc(db, 'customers', user.uid);
+    const userDoc = await getDoc(userDocRef);
+    
     if (!userDoc.exists()) return false;
     
-    const userData = userDoc.data();
-    return userData?.subscriptionStatus === 'active';
+    // Verificăm subcollection-ul subscriptions pentru abonamente active
+    const subscriptionsRef = collection(userDocRef, "subscriptions");
+    const subscriptionsSnapshot = await getDocs(subscriptionsRef);
+    
+    // Un utilizator este premium dacă are cel puțin un abonament cu status "active"
+    const isPremium = subscriptionsSnapshot.docs.some(doc => doc.data().status === "active");
+    
+    // Pentru debugging
+    console.log("[DEBUG] Premium check from isPremiumUser:", {
+      userId: user.uid,
+      isPremium,
+      numSubscriptions: subscriptionsSnapshot.size,
+      subscriptions: subscriptionsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        status: doc.data().status
+      }))
+    });
+    
+    return isPremium;
   } catch (error) {
     console.error('Error checking premium status:', error);
     return false;

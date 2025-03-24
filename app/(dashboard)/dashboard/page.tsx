@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, deleteDoc, updateDoc, addDoc, collection, arrayUnion } from "firebase/firestore";
+import { doc, getDoc, deleteDoc, updateDoc, addDoc, collection, arrayUnion, getDocs } from "firebase/firestore";
 import { toast } from "sonner";
 import { FaBriefcase, FaSuitcase, FaCommentDots } from "react-icons/fa";
 
@@ -38,6 +38,10 @@ const DashboardPage = () => {
 
   // Funcție pentru a deschide modalul de creare carieră
   const openCareerCreation = () => {
+    console.log("[DEBUG] Opening career creation modal:", {
+      isPremium,
+      user: user?.uid
+    });
     setShowCareerCreation(true);
   };
   
@@ -56,9 +60,34 @@ const DashboardPage = () => {
       setLoading(true);
 
       try {
-        // Verify if the user is premium
-        const userDoc = await getDoc(doc(db, "customers", user.uid));
-        const premium = userDoc.exists() && userDoc.data()?.isPremium === true;
+        // Verificarea corectă a statusului premium
+        let premium = false;
+        
+        // Obținem documentul principal al utilizatorului
+        const userDocRef = doc(db, "customers", user.uid);
+        const userDoc = await getDoc(userDocRef);
+        
+        // Verificăm dacă există abonamente active în subcollection-ul subscriptions
+        if (userDoc.exists()) {
+          const subscriptionsRef = collection(userDocRef, "subscriptions");
+          const subscriptionsSnapshot = await getDocs(subscriptionsRef);
+          
+          // Un utilizator este premium dacă are cel puțin un abonament cu status "active"
+          premium = subscriptionsSnapshot.docs.some(doc => doc.data().status === "active");
+          
+          console.log("[DEBUG] user premium status from subscriptions:", {
+            premium,
+            numSubscriptions: subscriptionsSnapshot.size,
+            subscriptions: subscriptionsSnapshot.docs.map(doc => ({
+              id: doc.id,
+              status: doc.data().status
+            })),
+            userId: user.uid
+          });
+        } else {
+          console.log("[DEBUG] user document does not exist:", user.uid);
+        }
+        
         setIsPremium(premium);
         
         // Get all the user's roadmaps
@@ -122,6 +151,16 @@ const DashboardPage = () => {
       errorDisplayed = true; // Prevent error toast if component unmounts during loading
     };
   }, [user]);
+  
+  // Adăugăm log pentru a vedea starea premium la momentul redării
+  useEffect(() => {
+    console.log("[DEBUG] Dashboard current state:", {
+      isPremium,
+      user: user?.uid,
+      allRoadmapsCount: allRoadmaps.length,
+      isModalOpen: showCareerCreation
+    });
+  }, [isPremium, user, allRoadmaps, showCareerCreation]);
   
   // Funcție pentru a seta un roadmap ca activ
   const handleSetActiveRoadmap = async (roadmapId: string): Promise<void> => {
@@ -207,9 +246,15 @@ const DashboardPage = () => {
           isPublic: true, // Toate roadmap-urile sunt acum public în mod implicit
           creatorName: user.displayName || 'Anonymous',
           creatorEmail: user.email || '',
+          isActive: true, // Marcăm roadmap-ul ca fiind activ
           createdAt: new Date(),
           updatedAt: new Date()
         };
+        
+        console.log("[DEBUG] Roadmap structure generated:", {
+          title: roadmapWithMetadata.title,
+          sectionsCount: roadmapWithMetadata.sections?.length || 0
+        });
         
         // Actualizăm starea cu datele generate
         setCurrentRoadmap(roadmapWithMetadata as ExtendedRoadmapType);
@@ -219,15 +264,25 @@ const DashboardPage = () => {
         
         // Salvăm roadmap-ul în Firestore
         try {
-          const roadmapDocRef = await addDoc(collection(db, "roadmaps"), {
+          // IMPORTANT: Salvăm datele direct în document, nu încapsulate într-un câmp "roadmap"
+          const newRoadmapData = {
+            ...roadmapWithMetadata,
             userId: user.uid,
-            roadmap: roadmapWithMetadata,
-            isPublic: true, // Adăugăm și la nivelul documentului
+            isPublic: true,
+            isActive: true,
             creatorName: user.displayName || 'Anonymous',
             creatorEmail: user.email || '',
             createdAt: new Date(),
             updatedAt: new Date()
+          };
+          
+          console.log("[DEBUG] Saving roadmap to Firestore with data:", {
+            title: newRoadmapData.title,
+            userId: newRoadmapData.userId,
+            isPublic: newRoadmapData.isPublic
           });
+          
+          const roadmapDocRef = await addDoc(collection(db, "roadmaps"), newRoadmapData);
           
           // Actualizăm roadmap-ul cu ID-ul din Firestore
           const roadmapWithId = {
@@ -245,6 +300,17 @@ const DashboardPage = () => {
             roadmapId: roadmapDocRef.id,
             roadmaps: arrayUnion(roadmapDocRef.id), // Adăugăm într-un array de roadmap-uri
             updatedAt: new Date()
+          });
+          
+          // După salvare, actualizăm lista completă de roadmaps
+          // Acest lucru va asigura că roadmap-ul nou generat apare în listă și după refresh
+          const updatedRoadmaps = [...allRoadmaps];
+          updatedRoadmaps.push(roadmapWithId as ExtendedRoadmapType);
+          setAllRoadmaps(updatedRoadmaps);
+          
+          console.log("[DEBUG] Roadmap saved to Firestore and added to allRoadmaps:", {
+            id: roadmapDocRef.id,
+            allRoadmapsLength: updatedRoadmaps.length
           });
           
         } catch (firestoreError) {

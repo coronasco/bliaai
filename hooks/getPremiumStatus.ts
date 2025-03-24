@@ -1,6 +1,6 @@
 import { FirebaseApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { collection, getFirestore, onSnapshot, query, where } from "firebase/firestore";
+import { collection, getFirestore, getDocs } from "firebase/firestore";
 
 export const getPremiumStatus = async (app: FirebaseApp) => {
     const auth = getAuth(app);
@@ -10,22 +10,28 @@ export const getPremiumStatus = async (app: FirebaseApp) => {
 
     const db = getFirestore(app);
     const subscriptionRef = collection(db, "customers", userId, "subscriptions");
-    const q = query(
-        subscriptionRef,
-        where("status", "in", ["trailing", "active"])
-    )
     
-    return new Promise((resolve, reject) => {
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            if (snapshot.docs.length === 0) {
-                resolve(false);
-            } else {
-                resolve(true);
-            }
-
-            unsubscribe();
-        },
-        reject
-    )
-    })
+    try {
+        // Folosim getDocs pentru o evaluare directă, nu un listener permanent
+        const snapshot = await getDocs(subscriptionRef);
+        
+        // Un utilizator este premium dacă are cel puțin un abonament cu status "active"
+        const isActive = snapshot.docs.some(doc => doc.data().status === "active");
+        
+        // Pentru debugging
+        console.log("[DEBUG] Premium check from getPremiumStatus:", {
+            userId,
+            isActive,
+            numSubscriptions: snapshot.size,
+            subscriptions: snapshot.docs.map(doc => ({
+                id: doc.id,
+                status: doc.data().status
+            }))
+        });
+        
+        return isActive;
+    } catch (error) {
+        console.error("Error checking premium status:", error);
+        return false;
+    }
 }

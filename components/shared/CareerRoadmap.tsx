@@ -231,9 +231,6 @@ const CareerRoadmap = ({
   } | null>(null);
   const [isSubmittingIssue, setIsSubmittingIssue] = useState(false);
   
-  // Adăugăm state pentru nivelul roadmap-ului
-  const [roadmapLevel, setRoadmapLevel] = useState<string>("beginner");
-  
   // Adăugăm un nou state pentru a controla modalul
   const [showRoadmapModal, setShowRoadmapModal] = useState(false);
   
@@ -251,9 +248,9 @@ const CareerRoadmap = ({
   // Adăugăm state pentru a gestiona afișarea roadmap-urilor disponibile
   const [showRoadmapsSelector, setShowRoadmapsSelector] = useState<boolean>(false);
   
-  // Calcul pentru numărul maxim de roadmap-uri permise
+  // Corectăm calculul pentru a permite utilizatorilor premium să creeze până la 4 roadmap-uri
   const maxRoadmaps = isPremium ? 4 : 1;
-  const canCreateNewRoadmap = allRoadmaps.length < maxRoadmaps && isPremium;
+  const canCreateNewRoadmap = allRoadmaps.length < maxRoadmaps;
   
   // Function to clean and format titles for display
   const cleanTitle = (title: string): string => {
@@ -783,84 +780,6 @@ const CareerRoadmap = ({
         )}
       </div>
     );
-  };
-
-  // Wrapper function for handleGenerateRoadmap that handles loading states
-  const handleRoadmapGeneration = async () => {
-    if (!onlineStatus) {
-      toast.error("You are not connected to the internet. Please check your connection and try again.");
-      return;
-    }
-    
-    // Verificăm dacă este deja în proces de generare
-    if (isRoadmapGenerating) {
-      return; // Avoid multiple generations
-    }
-    
-    const currentLevel = getRoadmapLevel();
-    
-    // Verificăm dacă utilizatorul este eligibil să genereze roadmap-ul de nivel următor
-    if (currentLevel === "beginner" && !isPremium) {
-      toast.error("You need a premium account to generate Intermediate level roadmaps", {
-        description: "Upgrade to premium to unlock intermediate and advanced roadmaps.",
-        action: {
-          label: "Upgrade",
-          onClick: () => window.location.href = "/pricing"
-        }
-      });
-      return;
-    }
-    
-    if (currentLevel === "advanced") {
-      toast.info("You've already generated all roadmap levels", {
-        description: "Your roadmap is complete with Beginner, Intermediate, and Advanced sections."
-      });
-      return;
-    }
-    
-    // Pregătim experienceLevel pentru următorul nivel
-    let targetLevel = "beginner";
-    if (currentLevel === "beginner" && isPremium) {
-      targetLevel = "intermediate";
-    } else if (currentLevel === "intermediate" && isPremium) {
-      targetLevel = "advanced";
-    }
-    
-    // Setăm nivelul de experiență
-    setRoadmapLevel(targetLevel);
-    
-    // Deschidem modalul pentru crearea roadmap-ului
-    setShowRoadmapModal(true);
-  };
-
-  // Add proper type for event handlers
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
-    setSearchTerm(e.target.value);
-  };
-
-  const handleExpandClick = (e: React.MouseEvent<HTMLButtonElement>): void => {
-    e.preventDefault();
-    e.stopPropagation();
-    console.log("Expand All clicked");
-    toggleAllSections(true);
-  };
-
-  const handleCollapseClick = (e: React.MouseEvent<HTMLButtonElement>): void => {
-    e.preventDefault();
-    e.stopPropagation();
-    console.log("Collapse All clicked");
-    toggleAllSections(false);
-  };
-
-  // Add type for section toggle
-  const handleSectionToggle = (sectionTitle: string): void => {
-    const newExpandedSections = new Set(expandedSections);
-    if (isSectionExpanded(sectionTitle)) {
-      newExpandedSections.delete(sectionTitle);
-    } else {
-      newExpandedSections.add(sectionTitle);
-    }
-    setExpandedSections(newExpandedSections);
   };
 
   // Add TutorialGenerationDialog component
@@ -1435,31 +1354,16 @@ const CareerRoadmap = ({
     );
   };
 
-  // Adăugăm funcția pentru a determina nivelul curent al roadmap-ului
-  const getRoadmapLevel = (): string => {
-    if (!roadmap || !roadmap.sections || roadmap.sections.length === 0) return "none";
-    
-    // Verificăm dacă avem secțiunea Advanced
-    const hasAdvanced = roadmap.sections.some(section => 
-      section.title.toLowerCase().includes("advanced"));
-    
-    // Verificăm dacă avem secțiunea Intermediate
-    const hasIntermediate = roadmap.sections.some(section => 
-      section.title.toLowerCase().includes("intermediate"));
-    
-    // Verificăm dacă avem secțiunea Beginner
-    const hasBeginner = roadmap.sections.some(section => 
-      section.title.toLowerCase().includes("beginner"));
-    
-    if (hasAdvanced) return "advanced";
-    if (hasIntermediate) return "intermediate";
-    if (hasBeginner) return "beginner";
-    
-    return "beginner"; // Default
-  };
-
   // Modificăm butonul de generare a roadmap-ului
   const renderGenerateButton = () => {
+    // Adăugăm un console log pentru debug
+    console.log("[DEBUG] renderGenerateButton called with:", { 
+      isPremium, 
+      onlineStatus, 
+      allRoadmapsLength: allRoadmaps.length, 
+      maxRoadmaps 
+    });
+
     if (!onlineStatus) {
       return (
         <Button
@@ -1473,7 +1377,35 @@ const CareerRoadmap = ({
       );
     }
     
-    if (!isPremium) {
+    // Verificăm dacă utilizatorul a atins limita de roadmap-uri
+    if (allRoadmaps.length >= maxRoadmaps) {
+      return (
+        <Button
+          variant="default"
+          className="bg-gray-700 text-gray-300 cursor-not-allowed"
+          onClick={() => toast.error(`You've reached the maximum limit of ${maxRoadmaps} roadmap${maxRoadmaps > 1 ? 's' : ''}`)}
+        >
+          <FaExclamationCircle className="mr-2 text-red-500" />
+          Limit Reached ({allRoadmaps.length}/{maxRoadmaps})
+        </Button>
+      );
+    }
+    
+    // Verifică și afișează starea pentru debugging
+    if (isPremium === true) {
+      // Pentru utilizatorii premium, permitere generarea de roadmap-uri
+      return (
+        <Button
+          onClick={handleOpenCreateCareer}
+          variant="default"
+          className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white"
+        >
+          <FaPlus className="mr-2" />
+          Generate Roadmap (Premium)
+        </Button>
+      );
+    } else {
+      // Pentru utilizatorii non-premium, afișare mesaj că funcționalitatea este doar pentru premium
       return (
         <Button
           variant="default"
@@ -1485,31 +1417,6 @@ const CareerRoadmap = ({
         </Button>
       );
     }
-    
-    // Verificăm dacă utilizatorul poate crea un nou roadmap
-    if (!canCreateNewRoadmap) {
-      return (
-        <Button
-          variant="default"
-          className="bg-gray-700 text-gray-300 cursor-not-allowed"
-          onClick={() => toast.error(`You've reached the maximum limit of ${maxRoadmaps} roadmaps`)}
-        >
-          <FaExclamationCircle className="mr-2 text-red-500" />
-          Limit Reached
-        </Button>
-      );
-    }
-    
-    return (
-      <Button
-        onClick={handleOpenCreateCareer}
-        variant="default"
-        className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white"
-      >
-        <FaPlus className="mr-2" />
-        Add Roadmap
-      </Button>
-    );
   };
 
   // Adăugăm o funcție specifică pentru generarea roadmap-ului
@@ -2050,6 +1957,16 @@ const CareerRoadmap = ({
       isOwner,
       isPremium,
       allRoadmapsCount: allRoadmaps?.length || 0,
+      maxRoadmaps,
+      canCreateNewRoadmap,
+    });
+
+    // Adăugăm un log specific pentru starea premium
+    console.log("[DEBUG] Premium status check:", { 
+      isPremium, 
+      allRoadmaps: allRoadmaps?.length, 
+      maxRoadmaps, 
+      renderButtonCondition: isPremium && allRoadmaps.length < maxRoadmaps 
     });
 
     // Verificăm și log-am informații specifice pentru debugging
@@ -2065,7 +1982,7 @@ const CareerRoadmap = ({
         loadPublicRoadmaps();
       }
     }
-  }, [roadmap, publicRoadmaps, showPublicRoadmapsModal, onlineStatus, isOwner, isPremium, allRoadmaps]);
+  }, [roadmap, publicRoadmaps, showPublicRoadmapsModal, onlineStatus, isOwner, isPremium, allRoadmaps, maxRoadmaps, canCreateNewRoadmap]);
 
   // Funcție de debug pentru a fi apelată la click pe buton
   const handleExploreClick = () => {
@@ -2217,6 +2134,36 @@ const CareerRoadmap = ({
     }, 0);
     
     return (completed / total) * 100;
+  };
+
+  // Add proper type for event handlers
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    setSearchTerm(e.target.value);
+  };
+
+  const handleExpandClick = (e: React.MouseEvent<HTMLButtonElement>): void => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log("Expand All clicked");
+    toggleAllSections(true);
+  };
+
+  const handleCollapseClick = (e: React.MouseEvent<HTMLButtonElement>): void => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log("Collapse All clicked");
+    toggleAllSections(false);
+  };
+
+  // Add type for section toggle
+  const handleSectionToggle = (sectionTitle: string): void => {
+    const newExpandedSections = new Set(expandedSections);
+    if (isSectionExpanded(sectionTitle)) {
+      newExpandedSections.delete(sectionTitle);
+    } else {
+      newExpandedSections.add(sectionTitle);
+    }
+    setExpandedSections(newExpandedSections);
   };
   
   return (
@@ -2514,7 +2461,6 @@ const CareerRoadmap = ({
         onClose={() => setShowRoadmapModal(false)}
         onGenerate={handleCreateRoadmap}
         isLoading={isRoadmapGenerating}
-        roadmapLevel={roadmapLevel}
       />
     </div>
   );

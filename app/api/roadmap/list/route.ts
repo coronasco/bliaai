@@ -17,6 +17,8 @@ export async function GET(req: NextRequest): Promise<Response> {
       );
     }
     
+    console.log("[DEBUG API] Loading roadmaps for user:", userId);
+    
     // Query roadmaps for this user
     const roadmapsQuery = query(
       collection(db, "roadmaps"),
@@ -27,13 +29,55 @@ export async function GET(req: NextRequest): Promise<Response> {
     // Get all roadmaps
     const querySnapshot = await getDocs(roadmapsQuery);
     
+    console.log("[DEBUG API] Roadmaps query results:", {
+      count: querySnapshot.size,
+      docs: querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        data: doc.data(),
+        // Inspectăm detalii critice
+        userId: doc.data().userId,
+        roadmapData: doc.data().roadmap ? 'exists' : 'missing',
+        nestedRoadmapUserId: doc.data().roadmap?.userId
+      }))
+    });
+    
     // Process results
-    const roadmaps = querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      createdAt: doc.data().createdAt?.toDate?.() || new Date(),
-      updatedAt: doc.data().updatedAt?.toDate?.() || new Date()
-    }));
+    const roadmaps = querySnapshot.docs.map(doc => {
+      // Verificăm structura documentului
+      const data = doc.data();
+      let roadmapData;
+      
+      // Unele roadmap-uri pot avea datele stocate în câmpul "roadmap"
+      if (data.roadmap && typeof data.roadmap === 'object') {
+        roadmapData = {
+          id: doc.id,
+          ...data.roadmap,
+          userId: data.userId || data.roadmap.userId, // Asigură-te că userId este păstrat
+          createdAt: data.createdAt?.toDate?.() || new Date(),
+          updatedAt: data.updatedAt?.toDate?.() || new Date()
+        };
+      } else {
+        // Altele pot avea datele direct în document
+        roadmapData = {
+          id: doc.id,
+          ...data,
+          createdAt: data.createdAt?.toDate?.() || new Date(),
+          updatedAt: data.updatedAt?.toDate?.() || new Date()
+        };
+      }
+      
+      return roadmapData;
+    });
+    
+    console.log("[DEBUG API] Processed roadmaps:", {
+      count: roadmaps.length,
+      first: roadmaps.length > 0 ? {
+        id: roadmaps[0].id,
+        title: roadmaps[0].title,
+        userId: roadmaps[0].userId,
+        sections: Array.isArray(roadmaps[0].sections) ? roadmaps[0].sections.length : 'not an array'
+      } : 'no roadmaps'
+    });
     
     return NextResponse.json({ 
       roadmaps,

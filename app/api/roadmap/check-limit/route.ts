@@ -17,13 +17,24 @@ export async function GET(req: NextRequest): Promise<Response> {
       );
     }
     
-    // Get user premium status
-    const userDoc = await getDoc(doc(db, "customers", userId));
-    
+    // Get user premium status - verificare corectă pe baza abonamentelor
     let isPremium = false;
+    const userDocRef = doc(db, "customers", userId);
+    const userDoc = await getDoc(userDocRef);
     
     if (userDoc.exists()) {
-      isPremium = userDoc.data()?.isPremium === true;
+      // Verificăm subcollection-ul subscriptions pentru abonamente active
+      const subscriptionsRef = collection(userDocRef, "subscriptions");
+      const subscriptionsSnapshot = await getDocs(subscriptionsRef);
+      
+      // Un utilizator este premium dacă are cel puțin un abonament cu status "active"
+      isPremium = subscriptionsSnapshot.docs.some(doc => doc.data().status === "active");
+      
+      console.log("[DEBUG] API check-limit premium check:", {
+        userId,
+        isPremium,
+        numSubscriptions: subscriptionsSnapshot.size
+      });
     }
     
     // Maximum allowed roadmaps

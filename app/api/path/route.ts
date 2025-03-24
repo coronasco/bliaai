@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 
 // OpenAI API Key from environment variables
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "" });
@@ -26,9 +26,22 @@ export async function POST(req: Request): Promise<Response> {
       return NextResponse.json({ error: "User ID is required" }, { status: 400 });
     }
 
-    // Verificăm statusul premium
-    const userDoc = await getDoc(doc(db, "customers", userId));
-    if (!userDoc.exists() || !userDoc.data()?.isPremium) {
+    // Verificăm statusul premium corect pe baza abonamentelor
+    const userDocRef = doc(db, "customers", userId);
+    const userDoc = await getDoc(userDocRef);
+
+    if (!userDoc.exists()) {
+      return NextResponse.json({ error: "User not found" }, { status: 403 });
+    }
+
+    // Verificăm subcollection-ul subscriptions pentru abonamente active
+    const subscriptionsRef = collection(userDocRef, "subscriptions");
+    const subscriptionsSnapshot = await getDocs(subscriptionsRef);
+
+    // Un utilizator este premium dacă are cel puțin un abonament cu status "active"
+    const isPremium = subscriptionsSnapshot.docs.some(doc => doc.data().status === "active");
+
+    if (!isPremium) {
       return NextResponse.json({ error: "Premium account required" }, { status: 403 });
     }
 
