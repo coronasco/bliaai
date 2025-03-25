@@ -164,9 +164,19 @@ const DashboardPage = () => {
   
   // Funcție pentru a seta un roadmap ca activ
   const handleSetActiveRoadmap = async (roadmapId: string): Promise<void> => {
-    if (!user?.uid || !roadmapId) return;
+    if (!user?.uid || !roadmapId) {
+      toast.error("Cannot activate roadmap: Missing user or roadmap ID");
+      return;
+    }
     
     try {
+      // Verificăm dacă roadmap-ul există în lista locală
+      const roadmapExists = allRoadmaps.some(rm => rm.id === roadmapId);
+      if (!roadmapExists) {
+        toast.error("Roadmap not found");
+        return;
+      }
+
       const response = await fetch('/api/roadmap/activate', {
         method: 'POST',
         headers: {
@@ -178,10 +188,11 @@ const DashboardPage = () => {
         })
       });
       
+      const data = await response.json();
+      
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
-        console.error("API Error when activating roadmap:", errorData);
-        throw new Error(errorData.error || 'Could not activate roadmap');
+        console.error("API Error when activating roadmap:", data);
+        throw new Error(data.error || 'Could not activate roadmap');
       }
       
       // Actualizăm starea locală
@@ -196,11 +207,14 @@ const DashboardPage = () => {
       const activeRoadmap = updatedRoadmaps.find(rm => rm.id === roadmapId) || null;
       if (activeRoadmap) {
         setCurrentRoadmap(activeRoadmap);
+        toast.success("Roadmap activated successfully!");
+      } else {
+        throw new Error("Could not find activated roadmap in local state");
       }
     } catch (error) {
       console.error("Error activating roadmap:", error);
       toast.error("Could not activate roadmap", {
-        description: "Please try again later. If the problem persists, contact support."
+        description: error instanceof Error ? error.message : "Please try again later. If the problem persists, contact support."
       });
     }
   };
@@ -457,6 +471,7 @@ const DashboardPage = () => {
             handleDeleteRoadmap={currentRoadmap ? handleDeleteRoadmap : undefined}
             isOwner={currentRoadmap?.userId === user?.uid || !currentRoadmap?.userId}
             handleSetActiveRoadmap={handleSetActiveRoadmap}
+            currentUserId={user?.uid}
           />
         </div>
       </div>

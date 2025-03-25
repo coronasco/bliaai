@@ -10,7 +10,9 @@ export async function GET(req: NextRequest): Promise<Response> {
     // Get optional filter parameters
     const url = new URL(req.url);
     const searchTerm = url.searchParams.get("search")?.toLowerCase() || "";
+    const queryTerm = url.searchParams.get("query")?.toLowerCase() || searchTerm; // Suport pentru ambele variante
     const limitParam = parseInt(url.searchParams.get("limit") || "20");
+    const sortParam = url.searchParams.get("sort") || "";
     
     // Build query to get public roadmaps
     const roadmapsRef = collection(db, "roadmaps");
@@ -46,11 +48,15 @@ export async function GET(req: NextRequest): Promise<Response> {
           continue;
         }
         
-        // Check if the roadmap has a title and matches the search term (if any)
-        if (
-          roadmapData.roadmap.title && 
-          (!searchTerm || roadmapData.roadmap.title.toLowerCase().includes(searchTerm))
-        ) {
+        // Verificăm dacă roadmap-ul corespunde termenului de căutare (dacă există)
+        const roadmapTitle = roadmapData.roadmap.title?.toLowerCase() || "";
+        const roadmapDescription = roadmapData.roadmap.description?.toLowerCase() || "";
+        const matchesSearch = !queryTerm || 
+                           roadmapTitle.includes(queryTerm) || 
+                           roadmapDescription.includes(queryTerm);
+        
+        // Adăugăm roadmap-ul la rezultate doar dacă se potrivește cu căutarea
+        if (matchesSearch) {
           // Get author information
           let userName = "Anonymous user";
           try {
@@ -86,6 +92,8 @@ export async function GET(req: NextRequest): Promise<Response> {
             description: roadmapData.roadmap.description || "",
             userName: userName,
             popularity: popularity,
+            requiredSkills: roadmapData.roadmap.requiredSkills || [],
+            difficulty: roadmapData.roadmap.experienceLevel || "beginner",
             createdAt: roadmapData.createdAt?.toDate?.() || new Date()
           });
         }
@@ -96,8 +104,12 @@ export async function GET(req: NextRequest): Promise<Response> {
       }
     }
     
-    // Sort roadmaps by popularity (descending)
-    publicRoadmaps.sort((a, b) => b.popularity - a.popularity);
+    // Sortăm roadmap-urile în funcție de parameter de sortare
+    if (sortParam === "popularity") {
+      publicRoadmaps.sort((a, b) => b.popularity - a.popularity);
+    } else if (sortParam === "newest") {
+      publicRoadmaps.sort((a, b) => b.createdAt - a.createdAt);
+    }
     
     return NextResponse.json({ 
       roadmaps: publicRoadmaps,
