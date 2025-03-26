@@ -5,7 +5,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { 
   FaPlus, FaCheck, FaRoad, FaSearch, FaSpinner, FaChevronDown, FaChevronUp, FaExternalLinkAlt, FaBookReader,
-  FaBrain, FaBug, FaList, FaPlay, FaCheckCircle, FaCrown, FaChartLine, FaFilter, FaWifi, FaExclamationCircle,
+  FaBrain, FaBug, FaCheckCircle, FaCrown, FaChartLine, FaFilter, FaWifi, FaExclamationCircle,
   FaTrash, FaMinus
 } from "react-icons/fa";
 import { 
@@ -26,7 +26,7 @@ import { Label } from "@/components/ui/label";
 import { Globe, Menu } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip } from "@/components/ui/tooltip";
-import CareerCreationModal from "@/components/shared/CareerCreationModal";
+import { CareerCreationModal } from "@/components/shared/CareerCreationModal";
 
 import QuizController from "@/components/shared/quiz/QuizController";
 import Markdown from "react-markdown";
@@ -136,6 +136,7 @@ export type RoadmapType = {
   isActive?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
+  isOriginal?: boolean;
 };
 
 type RoadmapGenerationOptions = {
@@ -155,7 +156,6 @@ type CareerRoadmapProps = {
   handleGenerateRoadmap: (level: string, options?: RoadmapGenerationOptions) => Promise<void>;
   handleOpenCreateCareer: () => void;
   setRoadmap: (roadmap: RoadmapType | null) => void;
-  setAllRoadmaps?: (roadmaps: RoadmapType[]) => void;
   detailedRoadmap?: {
     sections: MainTaskType[];
     requiredSkills?: string[];
@@ -164,7 +164,6 @@ type CareerRoadmapProps = {
   handleDeleteRoadmap?: () => Promise<void>;
   isOwner?: boolean;
   handleGeneratePathForSubtask?: (sectionIndex: number, subtaskIndex: number, description: string) => Promise<string | undefined>;
-  handleSetActiveRoadmap?: (roadmapId: string) => Promise<void>;
   currentUserId?: string; // ID-ul utilizatorului curent (proprietarul sesiunii)
 };
 
@@ -179,15 +178,12 @@ const CareerRoadmap = ({
   allRoadmaps = [],
   onlineStatus,
   isPremium,
-  handleGenerateRoadmap,
   handleOpenCreateCareer,
   setRoadmap,
-  setAllRoadmaps,
   detailedRoadmap,
   handleDeleteRoadmap,
   isOwner = false,
   handleGeneratePathForSubtask,
-  handleSetActiveRoadmap,
   currentUserId
 }: CareerRoadmapProps) => {
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
@@ -196,7 +192,7 @@ const CareerRoadmap = ({
   const [showFilters, setShowFilters] = useState<boolean>(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState<boolean>(false);
   const [cacheKey, setCacheKey] = useState<number>(Date.now());
-  const [isRoadmapGenerating, setIsRoadmapGenerating] = useState<boolean>(false);
+  
   const [showTutorialDialog, setShowTutorialDialog] = useState(false);
   const [tutorialGenerating, setTutorialGenerating] = useState(false);
   const [currentSubtask, setCurrentSubtask] = useState<{
@@ -234,10 +230,11 @@ const CareerRoadmap = ({
   const [isPathGenerating, setIsPathGenerating] = useState<boolean>(false);
   
   // Adăugăm state pentru a gestiona afișarea roadmap-urilor disponibile
-  const [showRoadmapsSelector, setShowRoadmapsSelector] = useState<boolean>(false);
+  const [showRoadmapSelector, setShowRoadmapSelector] = useState(false);
   
   // Adăugăm state pentru a gestiona afișarea modalului de explorare roadmap-uri
   const [showExploreModal, setShowExploreModal] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState(false);
   
   // Corectăm calculul pentru a permite utilizatorilor premium să creeze până la 4 roadmap-uri
   const maxRoadmaps = isPremium ? 4 : 1;
@@ -1357,68 +1354,21 @@ const CareerRoadmap = ({
       );
     }
     
-    // Verifică și afișează starea pentru debugging
-    if (isPremium === true) {
-      // Pentru utilizatorii premium, permitere generarea de roadmap-uri
-      return (
-        <Button
-          onClick={handleOpenCreateCareer}
-          variant="default"
-          className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white"
-        >
-          <FaPlus className="mr-2" />
-          Generate Roadmap (Premium)
-        </Button>
-      );
-    } else {
-      // Pentru utilizatorii non-premium, afișare mesaj că funcționalitatea este doar pentru premium
-      return (
-        <Button
-          variant="default"
-          className="bg-gradient-to-r from-gray-700 to-gray-600 hover:from-gray-800 hover:to-gray-700 text-white"
-          onClick={() => toast.error("This feature is only available for premium users")}
-        >
-          <FaCrown className="mr-2 text-amber-400" />
-          Generate Roadmap
-        </Button>
-      );
-    }
+    // Pentru toți utilizatorii, permitem generarea de roadmap-uri
+    return (
+      <Button
+        onClick={handleOpenCreateCareer}
+        variant="default"
+        className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white"
+      >
+        <FaPlus className="mr-2" />
+        Generate Roadmap
+      </Button>
+    );
   };
 
   // Adăugăm o funcție specifică pentru generarea roadmap-ului
-  const handleCreateRoadmap = async (
-    title: string,
-    experienceLevel: string,
-    description: string,
-    timeframe?: string,
-    learningFocus?: string,
-    currentSkills?: string,
-    preferredResources?: string[]
-  ) => {
-    try {
-      // Setăm starea de generare doar când începe cu adevărat generarea
-      setIsRoadmapGenerating(true);
-      
-      // Apelăm funcția de generare roadmap
-      await handleGenerateRoadmap(experienceLevel, {
-        title,
-        description,
-        timeframe,
-        learningFocus,
-        currentSkills,
-        preferredResources
-      });
-      
-      // Închidem modalul după generare
-      setShowRoadmapModal(false);
-    } catch (error) {
-      console.error('Error generating roadmap:', error);
-      toast.error('An error occurred while generating the roadmap');
-    } finally {
-      // Oprim animația de generare
-      setIsRoadmapGenerating(false);
-    }
-  };
+  
 
   // Adăugăm o funcție pentru path generation
   const handleGeneratePath = async (sectionIndex: number, subtaskIndex: number, description: string) => {
@@ -1633,6 +1583,8 @@ const CareerRoadmap = ({
       } else {
         // Documentul folosește structura nouă - actualizăm direct datele
         // Creăm un obiect de actualizare care exclude proprietățile read-only
+        
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { id, ...updateData } = updatedRoadmap;
         
         await updateDoc(roadmapRef, {
@@ -1680,124 +1632,75 @@ const CareerRoadmap = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roadmap, onlineStatus, isPremium, allRoadmaps, maxRoadmaps]);
 
-  // Funcție pentru a seta un roadmap ca activ
-  const handleActivateRoadmap = async (roadmapId: string) => {
-    if (!onlineStatus || !handleSetActiveRoadmap) {
-      toast.error("Cannot activate the roadmap at this time");
-      return;
-    }
-    
-    try {
-      await handleSetActiveRoadmap(roadmapId);
-      
-      toast.success("Roadmap activated successfully!");
-      
-      // Update local state
-      if (setAllRoadmaps) {
-        const updatedRoadmaps = allRoadmaps.map(rm => ({
-          ...rm,
-          isActive: rm.id === roadmapId
-        }));
-        setAllRoadmaps(updatedRoadmaps);
-        
-        // Set the active roadmap as the current roadmap
-        const activeRoadmap = updatedRoadmaps.find(rm => rm.id === roadmapId) || null;
-        if (activeRoadmap) {
-          setRoadmap(activeRoadmap);
-        }
-      }
-    } catch (error) {
-      console.error("Error activating roadmap:", getErrorMessage(error));
-      toast.error("Could not activate the roadmap", {
-        description: "Please try again later."
-      });
-    }
-  };
+  
   
   // Component pentru a afișa selectorul de roadmap-uri
   const RoadmapSelector = () => {
-    if (!allRoadmaps || allRoadmaps.length <= 1) return null;
+    // Adăugăm un log de debug pentru a verifica valorile
+    console.log("[DEBUG] RoadmapSelector called with:", { 
+      allRoadmaps,
+      currentUserId
+    });
     
     return (
-      <div className="relative">
-        <Button
-          variant="outline"
-          className="bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700"
-          onClick={() => setShowRoadmapsSelector(!showRoadmapsSelector)}
-        >
-          <FaList className="mr-1.5 h-4 w-4" />
-          Roadmaps ({allRoadmaps.length})
-        </Button>
-        
-        {showRoadmapsSelector && (
-          <div className="absolute top-full right-0 mt-2 w-72 bg-gray-800 rounded-md border border-gray-700 shadow-lg z-10">
-            <div className="p-3 border-b border-gray-700">
-              <h4 className="text-sm font-medium text-white">Your Roadmaps ({allRoadmaps.length}/{maxRoadmaps})</h4>
-            </div>
-            <div className="max-h-80 overflow-y-auto">
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-medium text-gray-300 flex items-center text-sm">
+            <FaRoad className="mr-1.5 h-3.5 w-3.5 text-indigo-400" /> 
+            <span>Your Roadmaps</span>
+            <Badge variant="outline" className="ml-2 bg-gray-800/80 px-2 py-0.5 text-xs h-5 text-gray-300 border-gray-700">
+              {allRoadmaps.length}/{maxRoadmaps}
+            </Badge>
+          </h3>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-800"
+            onClick={() => setShowRoadmapSelector(!showRoadmapSelector)}
+          >
+            {showRoadmapSelector ? "Hide" : "Show all"}
+            {showRoadmapSelector ? (
+              <FaChevronUp className="ml-1.5 h-3 w-3" />
+            ) : (
+              <FaChevronDown className="ml-1.5 h-3 w-3" />
+            )}
+          </Button>
+        </div>
+
+        {allRoadmaps.length === 0 ? (
+          <p className="text-sm text-gray-400">You haven&#39;t created any roadmaps yet</p>
+        ) : (
+          showRoadmapSelector && (
+            <div className="bg-gray-800 border border-gray-700 rounded-md p-2 mb-4 grid gap-2 max-h-48 overflow-y-auto custom-scrollbar">
               {allRoadmaps.map((rm) => (
-                <div 
-                  key={rm.id} 
-                  className={`p-3 border-b border-gray-700 last:border-b-0 hover:bg-gray-700/50 ${rm.isActive ? 'bg-gray-700/80' : ''}`}
+                <div
+                  key={rm.id}
+                  className={`flex items-center justify-between text-sm p-2 rounded cursor-pointer transition-colors ${
+                    roadmap?.id === rm.id
+                      ? "bg-indigo-900/50 text-white border border-indigo-700"
+                      : "bg-gray-850 hover:bg-gray-700/50 text-gray-300 border border-gray-700"
+                  }`}
+                  onClick={() => {
+                    setRoadmap(rm);
+                    setShowRoadmapSelector(false);
+                  }}
                 >
-                  <div className="flex justify-between items-center">
-                    <div className="flex-1">
-                      <h5 className={`text-sm font-medium mb-1 ${rm.isActive ? 'text-white' : 'text-gray-300'}`}>{rm.title}</h5>
-                      <div className="flex items-center">
-                        <div className="w-full bg-gray-700 rounded-full h-1.5 mr-2">
-                          <div 
-                            className="bg-gradient-to-r from-purple-500 to-indigo-500 h-1.5 rounded-full" 
-                            style={{ width: `${calculateProgressForRoadmap(rm)}%` }}
-                          ></div>
-                        </div>
-                        <span className="text-xs text-gray-400">
-                          {`${Math.round(calculateProgressForRoadmap(rm))}%`}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div className="flex gap-1">
-                      {!rm.isActive && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 px-2 bg-gray-800 border-gray-700 hover:bg-gray-700 text-xs text-gray-300"
-                          onClick={() => handleActivateRoadmap(rm.id)}
-                        >
-                          <FaPlay className="h-3 w-3" />
-                        </Button>
-                      )}
-                      {rm.isActive && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 px-2 bg-indigo-900/40 border-indigo-700 text-xs text-indigo-300"
-                          disabled
-                        >
-                          <FaCheckCircle className="h-3 w-3 mr-1" />
-                          Active
-                        </Button>
-                      )}
-                    </div>
+                  <div className="flex items-center space-x-2 truncate pr-2 max-w-[85%]">
+                    {rm.isActive && <FaCheckCircle className="text-green-500 h-3 w-3 flex-shrink-0" />}
+                    <span className="truncate">{rm.title}</span>
+                    {!rm.isOriginal && rm.userId !== currentUserId && (
+                      <Badge variant="outline" className="bg-blue-900/30 text-blue-300 text-[10px] h-4 border-blue-700 ml-1">
+                        Cloned
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <span className="text-xs text-gray-400">{calculateProgressForRoadmap(rm)}%</span>
                   </div>
                 </div>
               ))}
             </div>
-            
-            {canCreateNewRoadmap && (
-              <div className="p-3 border-t border-gray-700">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full bg-gray-800 border-gray-700 hover:bg-gray-700 text-gray-300"
-                  onClick={handleOpenCreateCareer}
-                >
-                  <FaPlus className="mr-1.5 h-3 w-3" />
-                  Create New Roadmap
-                </Button>
-              </div>
-            )}
-          </div>
+          )
         )}
       </div>
     );
@@ -1847,53 +1750,6 @@ const CareerRoadmap = ({
   
 
 
-  // Funcție pentru a gestiona clonarea roadmap-urilor
-  const handleCloneRoadmap = async (roadmapId: string) => {
-    if (!onlineStatus || !currentUserId) {
-      toast.error("Nu poți clona un roadmap în acest moment");
-      return;
-    }
-    
-    try {
-      // Facem request către API pentru a clona roadmap-ul
-      const response = await fetch('/api/roadmap/clone', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          roadmapId: roadmapId,
-          userId: currentUserId
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Eroare la clonarea roadmap-ului: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      toast.success("Roadmap clonat cu succes!");
-      
-      // Actualizăm lista de roadmap-uri
-      if (setAllRoadmaps && allRoadmaps) {
-        const newRoadmap = {
-          id: data.roadmap.id,
-          title: data.roadmap.title,
-          description: data.roadmap.description,
-          sections: data.roadmap.sections || [],
-          userId: currentUserId,
-          isActive: false
-        };
-        
-        setAllRoadmaps([...allRoadmaps, newRoadmap]);
-      }
-    } catch (error) {
-      console.error("Error cloning roadmap:", getErrorMessage(error));
-      toast.error("Nu s-a putut clona roadmap-ul");
-    }
-  };
-
   // Funcție pentru deschiderea modalului de explorare
   const handleExploreClick = (e?: React.MouseEvent) => {
     if (e) {
@@ -1908,6 +1764,54 @@ const CareerRoadmap = ({
     
     // Setăm starea modalului de explorare
     setShowExploreModal(true);
+  };
+  
+  // Modificăm funcția pentru a încărca un roadmap public în loc să îl cloneze
+  const handleUsePublicRoadmap = async (roadmapId: string) => {
+    try {
+      setIsLoading(true);
+      
+      if (!currentUserId) {
+        toast.error("You need to be signed in to use roadmaps");
+        return;
+      }
+      
+      if (!onlineStatus) {
+        toast.error("You need to be online to view roadmaps");
+        return;
+      }
+      
+      console.log("[DEBUG] Loading public roadmap:", roadmapId);
+      
+      // Obținem datele roadmap-ului
+      const response = await fetch(`/api/roadmap/${roadmapId}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to load roadmap: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (!data.roadmap) {
+        throw new Error("Invalid roadmap data received");
+      }
+      
+      toast.success("Roadmap loaded successfully!");
+      
+      // Închidem modalul de explorare
+      setShowExploreModal(false);
+      
+      // Setăm roadmap-ul încărcat ca roadmap curent
+      if (setRoadmap) {
+        setRoadmap(data.roadmap);
+      }
+      
+    } catch (error) {
+      console.error("Error loading public roadmap:", error);
+      toast.error("Failed to load the roadmap. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
   
   return (
@@ -1951,20 +1855,7 @@ const CareerRoadmap = ({
             </div>
           </CardHeader>
           
-          {isRoadmapGenerating && (
-            <div className="absolute inset-0 bg-gradient-to-br from-gray-900 to-gray-800 z-5">
-              <div className="flex flex-col items-center justify-center h-full">
-                <FaSpinner className="animate-spin mr-2 h-8 w-8 text-purple-500" />
-                <h3 className="text-white text-lg font-medium mt-6 mb-2">
-                  Generating your personalized roadmap
-                </h3>
-                <p className="text-gray-400 text-sm max-w-md text-center">
-                  Analyzing hundreds of careers to create your best development plan.
-                  This process may take up to 1 minute.
-                </p>
-              </div>
-            </div>
-          )}
+          
           
           <CardContent className="py-12 px-6 bg-gray-900">
             <div className="max-w-3xl mx-auto text-center">
@@ -2029,64 +1920,72 @@ const CareerRoadmap = ({
           </CardContent>
         </Card>
       ) : (
-        <Card className="shadow-lg overflow-hidden border border-gray-700 bg-gray-900 gap-0">
-          <CardHeader className="pb-3 border-b border-gray-700 bg-gray-900">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-              <div>
-                <CardTitle className="text-xl flex items-center text-white">
-                  <FaRoad className="mr-2 text-purple-500" />
-                  Career Roadmap
-                </CardTitle>
-                <CardDescription className="text-gray-400">Track your progress toward your career goal</CardDescription>
+        <Card className="shadow-lg overflow-hidden border border-gray-700 bg-gradient-to-b from-gray-900 to-gray-850 gap-0">
+          <CardHeader className="pb-3 border-b border-gray-700 bg-transparent">
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div>
+                  <CardTitle className="text-xl flex items-center text-white">
+                    <FaRoad className="mr-2 text-indigo-500" />
+                    Career Roadmap
+                  </CardTitle>
+                  <CardDescription className="text-gray-400">Track your progress toward your career goal</CardDescription>
+                </div>
+                
+                <div className="flex flex-wrap sm:flex-nowrap gap-2 self-start">
+                  {isPremium && canCreateNewRoadmap && (
+                    <Button
+                      onClick={handleOpenCreateCareer}
+                      variant="default"
+                      size="sm"
+                      className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
+                    >
+                      <FaPlus className="mr-2 h-3.5 w-3.5" />
+                      Add Roadmap
+                    </Button>
+                  )}
+                  <Button
+                    onClick={handleExploreClick}
+                    variant="outline"
+                    size="sm"
+                    className="bg-gray-800/80 border-gray-700 text-gray-300 hover:bg-gray-700"
+                    title="Explore other roadmaps"
+                    disabled={!onlineStatus}
+                  >
+                    <FaSearch className="mr-1.5 h-3.5 w-3.5" />
+                    Explore
+                  </Button>
+                  {isOwner && roadmap && (
+                    <Button
+                      onClick={handleDeleteRoadmap}
+                      variant="destructive"
+                      size="sm"
+                      className="bg-red-600/90 hover:bg-red-700 text-white h-9 w-9 p-0"
+                      title="Delete Roadmap"
+                    >
+                      <FaTrash className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                  {!isOwner && handleDeleteRoadmap && (
+                    <Button
+                      onClick={handleDeleteRoadmap}
+                      variant="secondary"
+                      size="sm"
+                      className="bg-gray-700 hover:bg-gray-600 text-white h-9 w-9 p-0"
+                      title="Remove From Profile"
+                    >
+                      <FaTrash className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
               </div>
-              <div className="flex gap-2 self-start sm:self-center">
-                {allRoadmaps.length > 0 && <RoadmapSelector />}
-                {isPremium && canCreateNewRoadmap && (
-                  <Button
-                    onClick={handleOpenCreateCareer}
-                    variant="default"
-                    className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white"
-                  >
-                    <FaPlus className="mr-2" />
-                    Add Roadmap
-                  </Button>
-                )}
-                <Button
-                  onClick={handleExploreClick}
-                  variant="outline"
-                  className="bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700"
-                  title="Explore other roadmaps"
-                  disabled={!onlineStatus}
-                >
-                  <FaSearch className="mr-1.5 h-4 w-4" />
-                  Explore
-                </Button>
-                {isOwner && roadmap && (
-                  <Button
-                    onClick={handleDeleteRoadmap}
-                    variant="destructive"
-                    className="bg-red-600 hover:bg-red-700 text-white h-9 w-9 p-0"
-                    title="Delete Roadmap"
-                  >
-                    <FaTrash />
-                  </Button>
-                )}
-                {!isOwner && handleDeleteRoadmap && (
-                  <Button
-                    onClick={handleDeleteRoadmap}
-                    variant="secondary"
-                    className="bg-gray-700 hover:bg-gray-600 text-white h-9 w-9 p-0"
-                    title="Remove From Profile"
-                  >
-                    <FaTrash />
-                  </Button>
-                )}
-              </div>
+              
+              {allRoadmaps.length > 0 && <RoadmapSelector />}
             </div>
           </CardHeader>
           
           <CardContent className="p-0">
-            <div className="border-b border-gray-700 bg-gray-800 p-4">
+            <div className="border-b border-gray-700 bg-gray-800/50 p-4">
               <div className="flex flex-col md:flex-row justify-between max-w-3xl mx-auto">
                 <div className="mb-4 md:mb-0 space-y-1">
                   <h2 className="text-lg font-semibold text-white">{roadmap.title}</h2>
@@ -2202,15 +2101,23 @@ const CareerRoadmap = ({
       <CareerCreationModal
         isOpen={showRoadmapModal}
         onClose={() => setShowRoadmapModal(false)}
-        onGenerate={handleCreateRoadmap}
-        isLoading={isRoadmapGenerating}
       />
-      <ExploreRoadmapsModal
-        isOpen={showExploreModal}
-        onClose={() => setShowExploreModal(false)}
-        onCloneRoadmap={handleCloneRoadmap}
-        onlineStatus={onlineStatus}
-      />
+      {showExploreModal && (
+        <ExploreRoadmapsModal
+          isOpen={showExploreModal}
+          onClose={() => setShowExploreModal(false)}
+          onSelectRoadmap={handleUsePublicRoadmap}
+          onlineStatus={onlineStatus}
+        />
+      )}
+      {isLoading && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 p-4 rounded-lg shadow-lg flex items-center">
+            <FaSpinner className="animate-spin mr-2 text-indigo-500 h-5 w-5" />
+            <span className="text-white">Loading roadmap...</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -23,8 +23,10 @@ export async function GET(req: NextRequest): Promise<Response> {
         );
       }
       
-      // Check if the user has access to this roadmap
+      // Obținem datele roadmap-ului
       const roadmapData = roadmapDoc.data();
+      
+      // Check if the user has access to this roadmap
       if (roadmapData.userId !== userId && !roadmapData.isPublic) {
         return NextResponse.json(
           { error: "You don't have access to this roadmap" }, 
@@ -32,7 +34,78 @@ export async function GET(req: NextRequest): Promise<Response> {
         );
       }
       
-      // Return the roadmap data
+      // Verificăm dacă este un roadmap clonat (non-original) și are o referință către original
+      if (roadmapData.originalRoadmapId && roadmapData.isOriginal === false) {
+        console.log(`[DEBUG API] Found cloned roadmap (${roadmapId}), loading original (${roadmapData.originalRoadmapId})`);
+        
+        try {
+          // Obținem datele din roadmap-ul original
+          const originalDoc = await getDoc(doc(db, "roadmaps", roadmapData.originalRoadmapId));
+          
+          if (originalDoc.exists()) {
+            const originalData = originalDoc.data();
+            console.log(`[DEBUG API] Original roadmap (${roadmapData.originalRoadmapId}) loaded successfully`);
+            
+            // Actualizăm timestamp-ul de sincronizare
+            await updateDoc(doc(db, "roadmaps", roadmapId), {
+              lastSyncedAt: serverTimestamp()
+            });
+            
+            // Determinăm care câmpuri să folosim de la roadmap-ul clonat și care de la original
+            let responseData;
+            
+            // Verificăm structura roadmap-ului original
+            if (originalData.roadmap && typeof originalData.roadmap === 'object') {
+              // Roadmap-ul original are structură nestată (câmp "roadmap")
+              responseData = {
+                id: roadmapId,
+                userId: roadmapData.userId,
+                isActive: roadmapData.isActive,
+                isPublic: roadmapData.isPublic,
+                isOriginal: false,
+                originalRoadmapId: roadmapData.originalRoadmapId,
+                createdAt: roadmapData.createdAt,
+                updatedAt: originalData.updatedAt,
+                lastSyncedAt: new Date(),
+                // Câmpurile roadmap-ului de la original
+                ...originalData.roadmap,
+                title: roadmapData.title || originalData.roadmap.title
+              };
+            } else {
+              // Roadmap-ul original are structură plată (câmpurile direct în document)
+              responseData = {
+                id: roadmapId,
+                userId: roadmapData.userId,
+                isActive: roadmapData.isActive,
+                isPublic: roadmapData.isPublic,
+                isOriginal: false,
+                originalRoadmapId: roadmapData.originalRoadmapId,
+                createdAt: roadmapData.createdAt,
+                updatedAt: originalData.updatedAt,
+                lastSyncedAt: new Date(),
+                // Câmpurile roadmap-ului de la original
+                sections: originalData.sections,
+                description: originalData.description,
+                requiredSkills: originalData.requiredSkills,
+                experienceLevel: originalData.experienceLevel,
+                title: roadmapData.title || originalData.title
+              };
+            }
+            
+            // Returnăm datele combinate
+            return NextResponse.json({
+              roadmap: responseData
+            });
+          } else {
+            console.log(`[DEBUG API] Original roadmap (${roadmapData.originalRoadmapId}) not found, using cloned data`);
+          }
+        } catch (originalError) {
+          console.error(`[DEBUG API] Error loading original roadmap:`, originalError);
+          // Vom continua cu datele roadmap-ului clonat dacă nu putem obține originalul
+        }
+      }
+      
+      // Dacă nu este clonat sau dacă nu am reușit să obținem originalul, returnăm datele proprii
       return NextResponse.json({
         roadmap: {
           id: roadmapDoc.id,

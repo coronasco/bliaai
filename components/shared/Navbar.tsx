@@ -85,6 +85,12 @@ export function Navbar({ isLandingPage = false }: NavbarProps) {
       highlight: false,
     },
     {
+      name: "Roadmaps",
+      href: "/roadmaps",
+      icon: <FaGraduationCap className="mr-2" />,
+      highlight: false,
+    },
+    {
       name: "School",
       href: "/dashboard/school",
       icon: <FaGraduationCap className="mr-2" />,

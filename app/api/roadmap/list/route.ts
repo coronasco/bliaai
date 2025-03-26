@@ -9,6 +9,11 @@ interface FirestoreTimestamp {
   toDate?: () => Date;
 }
 
+// Definim un tip cu toDate pentru Firebase Timestamp
+interface WithToDate {
+  toDate: () => Date;
+}
+
 // Definim interfața pentru substructura roadmap 
 interface RoadmapData {
   title?: string;
@@ -34,8 +39,8 @@ interface FirestoreRoadmapDoc {
   userId: string;
   title?: string;
   isActive?: boolean;
-  createdAt: FirestoreTimestamp | Timestamp;
-  updatedAt: FirestoreTimestamp | Timestamp;
+  createdAt: FirestoreTimestamp | Timestamp | string | Date;
+  updatedAt: FirestoreTimestamp | Timestamp | string | Date;
   description?: string;
   sections?: Array<{
     id: string;
@@ -85,15 +90,27 @@ interface Roadmap {
 /**
  * Convertește un timestamp Firestore într-un Date
  */
-function convertTimestamp(timestamp: FirestoreTimestamp | Timestamp | undefined): Date {
+function convertTimestamp(timestamp: FirestoreTimestamp | Timestamp | string | Date | undefined): Date {
   if (!timestamp) return new Date();
   
-  if (typeof timestamp.toDate === 'function') {
-    return timestamp.toDate();
+  // Gestionăm cazul când timestamp este deja un Date
+  if (timestamp instanceof Date) {
+    return timestamp;
   }
   
-  if ('_seconds' in timestamp) {
-    return new Date(timestamp._seconds * 1000);
+  // Gestionăm cazul când timestamp este un string ISO (care provine din Admin SDK)
+  if (typeof timestamp === 'string') {
+    return new Date(timestamp);
+  }
+  
+  // Gestionăm cazul când timestamp are metoda toDate()
+  if (typeof timestamp === 'object' && 'toDate' in timestamp) {
+    return (timestamp as WithToDate).toDate();
+  }
+  
+  // Gestionăm cazul când timestamp are proprietatea _seconds
+  if (typeof timestamp === 'object' && '_seconds' in timestamp) {
+    return new Date((timestamp as FirestoreTimestamp)._seconds * 1000);
   }
   
   return new Date();
@@ -134,7 +151,12 @@ export async function GET(req: NextRequest): Promise<Response> {
       
       // Process results
       const roadmaps = querySnapshot.docs.map(doc => {
-        const data = doc.data() as FirestoreRoadmapDoc;        
+        const data = doc.data() as FirestoreRoadmapDoc;  
+        
+        console.log(`[DEBUG API-LIST] Processing document ${doc.id}, createdAt type:`, 
+                    typeof data.createdAt, 
+                    'value:', data.createdAt);
+                    
         // Convertim timestamps-urile Firestore în Date objects
         const createdAt = convertTimestamp(data.createdAt);
         const updatedAt = convertTimestamp(data.updatedAt);

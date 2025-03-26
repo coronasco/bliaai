@@ -47,14 +47,40 @@ export async function GET(req: NextRequest): Promise<Response> {
     
     const currentRoadmapsCount = querySnapshot.size;
     
+    // Determinăm câte roadmap-uri sunt originale și câte sunt clonate
+    let originalCount = 0;
+    let clonedCount = 0;
+    
+    querySnapshot.forEach(doc => {
+      const data = doc.data();
+      if (data.isOriginal === false) {
+        clonedCount++;
+      } else {
+        originalCount++;
+      }
+    });
+    
+    // Determinăm dacă utilizatorii non-premium pot clona sau genera
+    const canGenerateNew = isPremium ? (currentRoadmapsCount < maxRoadmaps) : false;
+    const canClone = isPremium ? (currentRoadmapsCount < maxRoadmaps) : (currentRoadmapsCount < maxRoadmaps);
+    
     // Determine if user can create more roadmaps
     const canCreateMore = currentRoadmapsCount < maxRoadmaps;
     
+    // Adăugăm informații detaliate despre permisiuni și limită
     return NextResponse.json({
       canCreateMore,
+      canGenerateNew,
+      canClone,
       currentCount: currentRoadmapsCount,
+      originalCount,
+      clonedCount,
       maxAllowed: maxRoadmaps,
-      isPremium
+      isPremium,
+      nonPremiumCanGenerate: false, // Utilizatorii non-premium nu pot genera roadmap-uri noi, doar pot clona
+      message: isPremium 
+        ? `Premium users can have up to ${maxRoadmaps} roadmaps (${currentRoadmapsCount}/${maxRoadmaps} used)`
+        : `Free users can have only ${maxRoadmaps} roadmap (${currentRoadmapsCount}/${maxRoadmaps} used)`
     });
     
   } catch (error) {

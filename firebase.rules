@@ -26,25 +26,23 @@ service cloud.firestore {
       }
     }
     
-    // Rules for roadmaps collection - reguli simplificate complet
+    // Rules for roadmaps collection - implementarea noii strategii
     match /roadmaps/{id} {
-      // Oricine poate citi roadmap-urile
+      // Oricine poate citi roadmap-urile (publice sau proprii)
       allow read: if true;
       
-      // Reguli pentru scriere - simplificăm să cerem doar autentificare pentru update/delete
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      // Orice utilizator autentificat poate crea un roadmap
+      allow create: if request.auth != null;
       
-      // Simplificăm regula pentru update - permitem doar autentificarea
-      allow update: if request.auth != null;
-      
-      // Simplificăm regula pentru delete - permitem doar autentificarea
-      allow delete: if request.auth != null;
+      // Doar proprietarul sau adminii pot actualiza/șterge
+      allow update, delete: if request.auth != null && 
+                           (resource.data.userId == request.auth.uid || isAdmin());
     }
 
-    // Rules for paths collection - simplified too
+    // Rules for paths collection
     match /paths/{id} {
-      // Anyone can read paths
-      allow read: if true;
+      // Anyone authenticated can read paths
+      allow read: if request.auth != null;
       
       // Only authenticated user can create a path with their userId
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
@@ -67,42 +65,46 @@ service cloud.firestore {
       }
     }
     
-    // Rules for users collection - permitem citirea datelor utilizatorilor pentru afișarea numelui
+    // Rules for users collection
     match /users/{uid} {
       allow read: if request.auth != null;
       allow write: if request.auth.uid == uid || isAdmin();
     }
-    
+
     // Rules for roadmap_subtasks collection
     match /roadmap_subtasks/{id} {
       // Anyone authenticated can read subtasks
       allow read: if request.auth != null;
       
-      // Admins can update subtasks
-      allow update: if isAdmin();
-                      
       // Only authenticated user can create a subtask
       allow create: if request.auth != null;
       
-      // Admins can delete subtasks
-      allow delete: if isAdmin();
+      // Only owner or admin can update subtasks
+      allow update: if request.auth != null && 
+                   (resource.data.userId == request.auth.uid || isAdmin());
+      
+      // Only owner or admin can delete subtasks
+      allow delete: if request.auth != null && 
+                   (resource.data.userId == request.auth.uid || isAdmin());
     }
     
     // Rules for feedback collection
     match /feedback/{id} {
       // Anyone authenticated can read and create feedback
       allow read, create: if request.auth != null;
-
-      // Administratorii pot actualiza și șterge feedback-urile
-      allow update, delete: if request.auth != null && 
-                             (get(/databases/$(database)/documents/customers/$(request.auth.uid)).data.role == 'admin' || 
-                              get(/databases/$(database)/documents/customers/$(request.auth.uid)).data.roles.hasAny(['admin']));
+      
+      // Only admins can update and delete feedback
+      allow update, delete: if isAdmin();
     }
     
-    // Reguli pentru roadmap_clones - permitem utilizatorilor să înregistreze clonarea
-    match /roadmap_clones/{cloneId} {
-      // Orice utilizator autentificat poate citi sau crea înregistrări pentru clonare
+    // Rules for issues collection - utilizatorii pot raporta probleme pentru roadmap-uri
+    match /issues/{id} {
+      // Oricine autentificat poate citi și crea issue-uri
       allow read, create: if request.auth != null;
+      
+      // Doar proprietarul issue-ului sau adminii pot actualiza/șterge
+      allow update, delete: if request.auth != null && 
+                           (resource.data.reportedBy == request.auth.uid || isAdmin());
     }
   }
 }

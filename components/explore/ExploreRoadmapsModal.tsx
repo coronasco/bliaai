@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { FaSearch, FaSpinner, FaPlus, FaStar, FaFire } from "react-icons/fa";
+import { FaSearch, FaSpinner, FaFire, FaWifi, FaClone } from "react-icons/fa";
 import { HiOutlineTrendingUp } from "react-icons/hi";
 import { MdExplore } from "react-icons/md";
 import { motion, AnimatePresence } from "framer-motion";
@@ -33,14 +33,14 @@ export interface PublicRoadmap {
 interface ExploreRoadmapsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCloneRoadmap: (roadmapId: string) => Promise<void>;
+  onSelectRoadmap: (roadmapId: string) => Promise<void>;
   onlineStatus: boolean;
 }
 
 const ExploreRoadmapsModal: React.FC<ExploreRoadmapsModalProps> = ({
   isOpen,
   onClose,
-  onCloneRoadmap,
+  onSelectRoadmap,
   onlineStatus
 }) => {
   // State management
@@ -48,11 +48,10 @@ const ExploreRoadmapsModal: React.FC<ExploreRoadmapsModalProps> = ({
   const [roadmaps, setRoadmaps] = useState<PublicRoadmap[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [selectedRoadmap, setSelectedRoadmap] = useState<string | null>(null);
-  const [isCloningRoadmap, setIsCloningRoadmap] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>("popular");
   const [hasSearched, setHasSearched] = useState<boolean>(false);
   
-  // Încărcăm roadmap-urile populare inițial
+  // Load popular roadmaps initially
   const loadPublicRoadmaps = useCallback(async (query?: string) => {
     if (!onlineStatus) {
       toast.error("You need to be online to explore public roadmaps");
@@ -66,7 +65,7 @@ const ExploreRoadmapsModal: React.FC<ExploreRoadmapsModalProps> = ({
     try {
       console.log("[EXPLORE] Loading roadmaps...", query ? `Query: ${query}` : "Popular roadmaps");
       
-      // Construim URL-ul în funcție de parametri
+      // Build URL based on parameters
       let url = '/api/roadmap/public';
       const params = new URLSearchParams();
       
@@ -74,7 +73,7 @@ const ExploreRoadmapsModal: React.FC<ExploreRoadmapsModalProps> = ({
         params.append('query', query);
         setHasSearched(true);
       } else {
-        // Dacă nu avem query, cerem roadmap-urile populare
+        // If no query, request popular roadmaps
         params.append('sort', 'popularity');
         params.append('limit', '6');
       }
@@ -111,7 +110,7 @@ const ExploreRoadmapsModal: React.FC<ExploreRoadmapsModalProps> = ({
     }
   }, [onlineStatus, isLoading]);
 
-  // Încărcăm roadmap-urile când se deschide modalul
+  // Load roadmaps when modal opens
   useEffect(() => {
     if (isOpen && onlineStatus && roadmaps.length === 0 && !isLoading) {
       loadPublicRoadmaps();
@@ -137,25 +136,33 @@ const ExploreRoadmapsModal: React.FC<ExploreRoadmapsModalProps> = ({
     }
   };
 
-  // Handle roadmap cloning
+  // Handle cloning a roadmap
   const handleClone = async (roadmapId: string) => {
     if (!onlineStatus) {
-      toast.error("You need to be online to clone roadmaps");
+      toast.error("You need to be online to use roadmaps");
       return;
     }
     
     setSelectedRoadmap(roadmapId);
-    setIsCloningRoadmap(true);
     
     try {
-      await onCloneRoadmap(roadmapId);
-      toast.success("Roadmap cloned successfully!");
+      console.log("[DEBUG EXPLORE] Selecting roadmap:", roadmapId);
+      await onSelectRoadmap(roadmapId);
+      toast.success("Roadmap selected successfully!");
       onClose();
     } catch (error) {
-      console.error("Failed to clone roadmap:", error);
-      toast.error("Failed to clone the roadmap. Please try again.");
+      console.error("[DEBUG EXPLORE] Failed to select roadmap:", error);
+      
+      // Extract error message
+      let errorMessage = "Failed to select the roadmap. Please try again.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      
+      toast.error(errorMessage);
     } finally {
-      setIsCloningRoadmap(false);
       setSelectedRoadmap(null);
     }
   };
@@ -207,7 +214,6 @@ const ExploreRoadmapsModal: React.FC<ExploreRoadmapsModalProps> = ({
   // Render roadmap card
   const renderRoadmapCard = (roadmap: PublicRoadmap) => {
     const isSelected = selectedRoadmap === roadmap.id;
-    const isCloning = isSelected && isCloningRoadmap;
     
     return (
       <motion.div
@@ -243,178 +249,175 @@ const ExploreRoadmapsModal: React.FC<ExploreRoadmapsModalProps> = ({
         <div className="mt-3 flex justify-between items-center">
           {roadmap.userName && (
             <span className="text-xs text-gray-500 flex items-center">
-              Creat de: {roadmap.userName}
+              Created by: {roadmap.userName}
             </span>
           )}
           
           <Button
+            variant="outline"
             size="sm"
+            className="bg-indigo-900/30 border-indigo-700 text-indigo-300 hover:bg-indigo-800/50 hover:text-indigo-200"
             onClick={(e) => {
               e.stopPropagation();
               handleClone(roadmap.id);
             }}
-            disabled={isCloningRoadmap}
-            className={`bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1 
-              ${isCloning ? 'opacity-80' : ''}`}
+            disabled={selectedRoadmap === roadmap.id || !onlineStatus}
           >
-            {isCloning ? (
-              <>
-                <FaSpinner className="animate-spin h-3 w-3 mr-1.5" />
-                Clonare...
-              </>
+            {selectedRoadmap === roadmap.id ? (
+              <div className="flex items-center">
+                <FaSpinner className="animate-spin mr-1.5 h-3 w-3" />
+                <span>Selecting...</span>
+              </div>
             ) : (
-              <>
-                <FaPlus className="h-3 w-3 mr-1.5" />
-                Folosește
-              </>
+              <div className="flex items-center">
+                <FaClone className="mr-1.5 h-3 w-3" />
+                <span>Select</span>
+              </div>
             )}
           </Button>
         </div>
       </motion.div>
     );
   };
-
+  
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[650px] bg-gray-900 border border-gray-800 text-white p-0 overflow-hidden rounded-xl shadow-2xl">
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/30 via-gray-950 to-purple-950/20 -z-10" />
-        
-        <DialogHeader className="p-6 pb-2">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="bg-indigo-900/40 p-2 rounded-lg">
-              <MdExplore className="h-5 w-5 text-indigo-300" />
-            </div>
-            <DialogTitle className="text-xl font-semibold text-white">Explorează Roadmaps</DialogTitle>
-          </div>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-[700px] bg-gray-900 border border-gray-700 text-white">
+        <DialogHeader>
+          <DialogTitle className="flex items-center text-xl text-white">
+            <MdExplore className="mr-2 text-indigo-500" />
+            Explore Public Roadmaps
+          </DialogTitle>
           <DialogDescription className="text-gray-400">
-            Descoperă și folosește roadmap-uri create de comunitate
+            Discover and use roadmaps created by other users
           </DialogDescription>
         </DialogHeader>
         
-        <Tabs defaultValue="popular" value={activeTab} onValueChange={handleTabChange} className="px-6">
-          <TabsList className="bg-gray-800/70 border border-gray-700 h-11">
-            <TabsTrigger value="popular" className="data-[state=active]:bg-indigo-900/50 data-[state=active]:text-indigo-200">
-              <HiOutlineTrendingUp className="mr-2 h-4 w-4" />
-              Populare
-            </TabsTrigger>
-            <TabsTrigger value="search" className="data-[state=active]:bg-indigo-900/50 data-[state=active]:text-indigo-200">
-              <FaSearch className="mr-2 h-3.5 w-3.5" />
-              Caută
-            </TabsTrigger>
-          </TabsList>
-          
-          <div className="mt-4">
-            {activeTab === "search" && (
-              <form onSubmit={handleSearch} className="mb-4">
-                <div className="relative">
-                  <Input
-                    type="text"
-                    placeholder="Caută după titlu, descriere sau skills..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="bg-gray-800 border-gray-700 pl-10 pr-4 py-2 placeholder:text-gray-500"
-                  />
-                  <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 h-4 w-4" />
-                  <Button 
-                    type="submit" 
-                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 bg-indigo-600 hover:bg-indigo-700 px-3"
-                    disabled={!searchQuery.trim() || isLoading}
-                  >
-                    {isLoading ? <FaSpinner className="animate-spin h-3.5 w-3.5" /> : "Caută"}
-                  </Button>
-                </div>
-              </form>
+        <div className="space-y-4">
+          {/* Tabs */}
+          <Tabs
+            defaultValue="popular"
+            value={activeTab}
+            onValueChange={handleTabChange}
+            className="w-full"
+          >
+            <TabsList className="bg-gray-800/80 border border-gray-700">
+              <TabsTrigger 
+                value="popular" 
+                className="data-[state=active]:bg-indigo-900/30 data-[state=active]:text-indigo-300"
+              >
+                <FaFire className="mr-1.5 h-3.5 w-3.5" /> Popular
+              </TabsTrigger>
+              <TabsTrigger 
+                value="recent" 
+                className="data-[state=active]:bg-indigo-900/30 data-[state=active]:text-indigo-300"
+              >
+                <HiOutlineTrendingUp className="mr-1.5 h-3.5 w-3.5" /> Recent
+              </TabsTrigger>
+              <TabsTrigger 
+                value="search" 
+                className="data-[state=active]:bg-indigo-900/30 data-[state=active]:text-indigo-300"
+              >
+                <FaSearch className="mr-1.5 h-3.5 w-3.5" /> Search
+              </TabsTrigger>
+            </TabsList>
+            
+            {/* Search Bar - Shown at top for all tabs */}
+            <form onSubmit={handleSearch} className="mt-4 flex">
+              <div className="relative flex-1">
+                <Input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by title, skill, or level..."
+                  className="bg-gray-800 border-gray-700 text-white pl-10"
+                  disabled={!onlineStatus || isLoading}
+                />
+                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+              </div>
+              <Button 
+                type="submit"
+                className="ml-2 bg-indigo-600 text-white hover:bg-indigo-700"
+                disabled={!onlineStatus || isLoading || !searchQuery.trim()}
+              >
+                Search
+              </Button>
+            </form>
+            
+            {/* Warning if user is offline */}
+            {!onlineStatus && (
+              <div className="bg-red-900/30 border border-red-800 rounded-md p-3 text-sm text-gray-300 flex items-center">
+                <FaWifi className="text-red-500 mr-2 h-4 w-4" />
+                You are currently offline. Connect to the internet to explore roadmaps.
+              </div>
             )}
             
-            <TabsContent value="popular" className="mt-0">
-              <AnimatePresence>
-                {isLoading ? (
-                  <div className="py-12 flex flex-col justify-center items-center">
-                    <FaSpinner className="animate-spin h-8 w-8 text-indigo-500 mb-3" />
-                    <p className="text-gray-400">Se încarcă roadmap-urile populare...</p>
-                  </div>
-                ) : roadmaps.length === 0 ? (
-                  <div className="py-12 text-center">
-                    <div className="mx-auto w-14 h-14 rounded-full bg-gray-800/70 flex items-center justify-center mb-4">
-                      <FaStar className="text-amber-500 h-6 w-6" />
-                    </div>
-                    <h4 className="text-lg font-medium text-white mb-2">Niciun roadmap popular găsit</h4>
-                    <p className="text-gray-400 max-w-md mx-auto">
-                      Nu există încă roadmap-uri populare. Fii primul care împărtășește un roadmap cu comunitatea!
-                    </p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto pr-2 pb-2">
-                    {roadmaps.map(roadmap => renderRoadmapCard(roadmap))}
-                  </div>
-                )}
-              </AnimatePresence>
-            </TabsContent>
-            
-            <TabsContent value="search" className="mt-0">
-              <AnimatePresence>
-                {isLoading ? (
-                  <div className="py-12 flex flex-col justify-center items-center">
-                    <FaSpinner className="animate-spin h-8 w-8 text-indigo-500 mb-3" />
-                    <p className="text-gray-400">Se caută roadmap-uri...</p>
-                  </div>
-                ) : hasSearched && roadmaps.length === 0 ? (
-                  <div className="py-12 text-center">
-                    <div className="mx-auto w-14 h-14 rounded-full bg-gray-800/70 flex items-center justify-center mb-4">
-                      <FaSearch className="text-gray-500 h-6 w-6" />
-                    </div>
-                    <h4 className="text-lg font-medium text-white mb-2">Niciun rezultat găsit</h4>
-                    <p className="text-gray-400 max-w-md mx-auto">
-                      Nu am găsit roadmap-uri care să se potrivească cu căutarea ta. Încearcă alte cuvinte cheie.
-                    </p>
-                  </div>
-                ) : !hasSearched ? (
-                  <div className="py-12 text-center">
-                    <div className="mx-auto w-14 h-14 rounded-full bg-gray-800/70 flex items-center justify-center mb-4">
-                      <FaSearch className="text-indigo-400 h-6 w-6" />
-                    </div>
-                    <h4 className="text-lg font-medium text-white mb-2">Caută un roadmap</h4>
-                    <p className="text-gray-400 max-w-md mx-auto">
-                      Introdu un termen de căutare pentru a găsi roadmap-uri potrivite intereselor și obiectivelor tale.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto pr-2 pb-2">
-                    {roadmaps.map(roadmap => renderRoadmapCard(roadmap))}
-                  </div>
-                )}
-              </AnimatePresence>
-            </TabsContent>
-          </div>
-        </Tabs>
-        
-        <DialogFooter className="p-6 pt-3 border-t border-gray-800 bg-gray-900/50">
-          <Button
-            variant="outline"
-            onClick={onClose}
-            className="bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700"
-          >
-            Închide
-          </Button>
-          {selectedRoadmap && (
-            <Button
-              onClick={() => handleClone(selectedRoadmap)}
-              disabled={isCloningRoadmap}
-              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white"
-            >
-              {isCloningRoadmap ? (
-                <div className="flex items-center">
-                  <FaSpinner className="animate-spin mr-2 h-4 w-4" />
-                  Se clonează...
+            {/* Tab Content */}
+            <TabsContent value="popular" className="mt-4">
+              {isLoading ? (
+                <div className="flex justify-center items-center py-10">
+                  <FaSpinner className="animate-spin text-indigo-500 h-6 w-6" />
+                  <span className="ml-2 text-gray-400">Loading popular roadmaps...</span>
+                </div>
+              ) : roadmaps.length === 0 ? (
+                <div className="text-center py-10">
+                  <p className="text-gray-400">No popular roadmaps found.</p>
                 </div>
               ) : (
-                <>
-                  <FaPlus className="mr-2" />
-                  Folosește Roadmap-ul Selectat
-                </>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <AnimatePresence>
+                    {roadmaps.map((roadmap) => renderRoadmapCard(roadmap))}
+                  </AnimatePresence>
+                </div>
               )}
-            </Button>
-          )}
+            </TabsContent>
+            
+            <TabsContent value="recent" className="mt-4">
+              <div className="flex justify-center items-center py-10">
+                <FaSpinner className="animate-spin text-indigo-500 h-6 w-6" />
+                <span className="ml-2 text-gray-400">Loading recent roadmaps...</span>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="search" className="mt-4">
+              {isLoading ? (
+                <div className="flex justify-center items-center py-10">
+                  <FaSpinner className="animate-spin text-indigo-500 h-6 w-6" />
+                  <span className="ml-2 text-gray-400">Searching for roadmaps...</span>
+                </div>
+              ) : hasSearched ? (
+                roadmaps.length === 0 ? (
+                  <div className="text-center py-10">
+                    <p className="text-gray-400">No roadmaps found matching your search.</p>
+                    <p className="text-gray-500 text-sm mt-2">Try different keywords or browse popular roadmaps.</p>
+                  </div>
+                ) : (
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <AnimatePresence>
+                      {roadmaps.map((roadmap) => renderRoadmapCard(roadmap))}
+                    </AnimatePresence>
+                  </div>
+                )
+              ) : (
+                <div className="text-center py-10">
+                  <p className="text-gray-400">Enter keywords above to search for roadmaps.</p>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
+        
+        <DialogFooter className="flex items-center justify-between">
+          <span className="text-sm text-gray-500">
+            {roadmaps.length} roadmaps found
+          </span>
+          <Button 
+            variant="outline" 
+            className="bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700"
+            onClick={onClose}
+          >
+            Close
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -1,313 +1,335 @@
 "use client";
 
-import React, { useState } from "react";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog";
-import { Button } from "../ui/button";
-import { Input } from "../ui/input";
-import { Textarea } from "../ui/textarea";
-import { Label } from "../ui/label";
-import { FaBrain, FaRocket, FaLightbulb, FaMapMarkedAlt, FaGraduationCap, FaClipboardList, FaRegLightbulb, FaCode } from "react-icons/fa";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { X, Plus, Loader2, Check } from "lucide-react";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, Timestamp } from "firebase/firestore";
+import { toast } from "react-hot-toast";
+import { v4 as uuidv4 } from "uuid";
+import { useRouter } from "next/navigation";
 
-type CareerCreationModalProps = {
+interface CareerCreationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onGenerate: (
-    title: string, 
-    experienceLevel: string, 
-    description: string,
-    timeframe?: string,
-    learningFocus?: string,
-    currentSkills?: string,
-    preferredResources?: string[]
-  ) => Promise<void>;
-  isLoading: boolean;
-  roadmapLevel?: string;
-};
+}
 
-/**
- * Component for creating a career roadmap
- */
-const CareerCreationModal = ({ isOpen, onClose, onGenerate, isLoading, roadmapLevel = "beginner" }: CareerCreationModalProps) => {
-  const [title, setTitle] = useState("");
+const GENERATION_STEPS = [
+  { id: 1, text: "Analyzing career requirements and prerequisites..." },
+  { id: 2, text: "Structuring comprehensive learning path..." },
+  { id: 3, text: "Adding detailed subtasks and milestones..." },
+  { id: 4, text: "Optimizing learning sequence and progression..." },
+  { id: 5, text: "Finalizing roadmap with best practices..." }
+];
+
+export function CareerCreationModal({ isOpen, onClose }: CareerCreationModalProps) {
+  const router = useRouter();
+  const [careerTitle, setCareerTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [skills, setSkills] = useState<string[]>([]);
+  const [newSkill, setNewSkill] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
 
-  const handleClose = () => {
-    if (!isLoading) {
-      setTitle("");
-      setDescription("");
-      onClose();
+  useEffect(() => {
+    if (isGenerating) {
+      const interval = setInterval(() => {
+        setCurrentStep(prev => {
+          if (prev < GENERATION_STEPS.length - 1) {
+            setCompletedSteps(prevSteps => [...prevSteps, prev]);
+            return prev + 1;
+          }
+          clearInterval(interval);
+          return prev;
+        });
+      }, 2000); // Schimbă pasul la fiecare 2 secunde
+
+      return () => clearInterval(interval);
+    } else {
+      setCurrentStep(0);
+      setCompletedSteps([]);
+    }
+  }, [isGenerating]);
+
+  const handleAddSkill = () => {
+    if (newSkill.trim() && !skills.includes(newSkill.trim())) {
+      setSkills([...skills, newSkill.trim()]);
+      setNewSkill("");
     }
   };
 
-  const handleGenerate = async () => {
-    if (!title) return;
-    await onGenerate(
-      title, 
-      roadmapLevel, 
-      description,
-      undefined,
-      undefined,
-      undefined,
-      undefined
-    );
+  const handleRemoveSkill = (skillToRemove: string) => {
+    setSkills(skills.filter(skill => skill !== skillToRemove));
   };
 
-  const getModalTitle = () => {
-    switch (roadmapLevel) {
-      case "intermediate":
-        return "Generate Intermediate Roadmap";
-      case "advanced":
-        return "Generate Advanced Roadmap";
-      default:
-        return "Generate Career Roadmap";
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleAddSkill();
+    }
+  };
+
+  const generateRoadmap = async () => {
+    if (!careerTitle.trim()) {
+      toast.error("Please enter a career title");
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      // Generate roadmap content using AI
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: `Generate a detailed roadmap for becoming a ${careerTitle}. 
+          ${description ? `Additional context: ${description}` : ""}
+          ${skills.length > 0 ? `Required skills: ${skills.join(", ")}` : ""}
+          Please provide a comprehensive learning path with sections and subtasks.`,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (!data || !data.data || !data.data.description) {
+        throw new Error("Invalid response format from API");
+      }
+
+      const generatedContent = data.data.description;
+
+      // Parse the markdown content to create sections
+      const sections = generatedContent.split(/^##\s+/m).slice(1).map((section: string) => {
+        const [title, ...content] = section.split('\n');
+        const description = content.join('\n').trim();
+        
+        // Create subtasks from the content
+        const subtasks = description.split(/^###\s+/m).slice(1).map(subtask => {
+          const [subtaskTitle, ...subtaskContent] = subtask.split('\n');
+          return {
+            id: uuidv4(),
+            title: subtaskTitle.trim(),
+            description: subtaskContent.join('\n').trim(),
+            content: subtaskContent.join('\n').trim(),
+            completed: false,
+            lastModifiedBy: "admin",
+            lastModifiedAt: Timestamp.now(),
+          };
+        });
+
+        return {
+          id: uuidv4(),
+          title: title.trim(),
+          description: description.split('\n')[0].trim(), // First line as description
+          lastModifiedBy: "admin",
+          lastModifiedAt: Timestamp.now(),
+          subtasks: subtasks.length > 0 ? subtasks : [{
+            id: uuidv4(),
+            title: "Overview",
+            description: description.split('\n')[0].trim(),
+            content: description,
+            completed: false,
+            lastModifiedBy: "admin",
+            lastModifiedAt: Timestamp.now(),
+          }]
+        };
+      });
+
+      // Create the roadmap document
+      const roadmapData = {
+        title: careerTitle,
+        description: generatedContent,
+        experienceLevel: "beginner",
+        requiredSkills: skills,
+        isPublic: true,
+        isOfficial: false,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+        lastModifiedBy: "admin",
+        lastModifiedAt: Timestamp.now(),
+        sections: sections
+      };
+
+      // Save to Firestore and redirect to the new roadmap
+      const docRef = await addDoc(collection(db, "roadmaps"), roadmapData);
+      toast.success("Career roadmap generated successfully!");
+      router.push(`/admin/roadmaps/${docRef.id}`);
+      onClose();
+    } catch (error) {
+      console.error("Error generating roadmap:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to generate roadmap");
+    } finally {
+      setIsGenerating(false);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={isLoading ? undefined : handleClose}>
-      <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden rounded-xl border border-gray-700 shadow-2xl bg-gray-900">
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-950/20 via-gray-950 to-blue-950/20 -z-10" />
-        
-        <DialogHeader className="p-6 pb-2">
-          <div className="flex items-center gap-3">
-            <div className="bg-indigo-900/30 p-2 rounded-lg">
-              <FaMapMarkedAlt className="h-6 w-6 text-indigo-400" />
-            </div>
-            <DialogTitle className="text-white text-xl font-bold">{getModalTitle()}</DialogTitle>
-          </div>
-          <DialogDescription className="text-gray-300 mt-2">
-            Create a personalized roadmap for your professional development
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[600px] bg-gray-900 border-gray-800">
+        <DialogHeader>
+          <DialogTitle className="text-2xl font-bold text-white">
+            {isGenerating ? "Generating Your Roadmap" : "Create Career Roadmap"}
+          </DialogTitle>
+          <DialogDescription className="text-gray-400">
+            {isGenerating 
+              ? "Our AI is crafting a personalized learning path for you"
+              : "Generate a detailed learning path for your chosen career"}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="px-6">
-        {isLoading ? (
-            <AnimatePresence>
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="py-6 flex flex-col items-center"
-              >
-                <div className="bg-black/40 backdrop-blur-xl p-3 rounded-xl border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.5)] relative overflow-hidden mb-6">
-                  <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 via-purple-600/10 to-blue-500/10"
-                    animate={{ 
-                      backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"]
-                    }}
-                    transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
-                  />
-                  <motion.div
-                    className="relative w-6 h-6 flex items-center justify-center"
-                  >
-                    <motion.div 
-                      className="absolute w-full h-full border-2 border-transparent border-t-cyan-400 border-r-purple-400 rounded-full"
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                    />
-                    <motion.div 
-                      className="absolute w-4 h-4 border-2 border-transparent border-b-indigo-300 border-l-blue-400 rounded-full"
-                      animate={{ rotate: -360 }}
-                      transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-                    />
-                    <motion.div 
-                      className="w-1.5 h-1.5 bg-white rounded-full"
-                      animate={{ scale: [1, 1.5, 1] }}
-                      transition={{ duration: 2, repeat: Infinity }}
-                    />
-                  </motion.div>
+        {isGenerating ? (
+          <div className="space-y-6 py-4">
+            <div className="flex flex-col items-center justify-center space-y-4">
+              <div className="relative">
+                <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                  <Loader2 className="w-8 h-8 text-purple-600 animate-spin" />
                 </div>
-                
-                <motion.h3 
-                  className="text-xl font-semibold mb-3 text-white"
-                  animate={{ opacity: [0.8, 1, 0.8] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                >
-                  Generating Your Roadmap
-                </motion.h3>
-                
-                <p className="text-gray-300 text-center max-w-sm">
-                  We&apos;re creating a personalized learning journey tailored to your career goals
+              </div>
+              <div className="space-y-2 text-center">
+                <h3 className="text-lg font-semibold text-white">AI Generation in Progress</h3>
+                <div className="space-y-3">
+                  {GENERATION_STEPS.map((step, index) => (
+                    <div
+                      key={step.id}
+                      className={`flex items-center justify-center space-x-2 transition-all duration-500 ${
+                        index === currentStep
+                          ? "opacity-100 transform translate-x-0"
+                          : index < currentStep
+                          ? "opacity-100 transform translate-x-0"
+                          : "opacity-0 transform translate-x-4"
+                      }`}
+                    >
+                      {completedSteps.includes(index) ? (
+                        <Check className="w-5 h-5 text-green-500" />
+                      ) : index === currentStep ? (
+                        <Loader2 className="w-5 h-5 text-purple-500 animate-spin" />
+                      ) : (
+                        <div className="w-5 h-5 rounded-full border-2 border-gray-600" />
+                      )}
+                      <p className={`text-sm ${
+                        completedSteps.includes(index)
+                          ? "text-green-500"
+                          : index === currentStep
+                          ? "text-purple-500"
+                          : "text-gray-400"
+                      }`}>
+                        {step.text}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-4">
+                  This process typically takes 10-15 seconds
                 </p>
-                
-                <div className="relative w-full max-w-md mt-6">
-                  <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                    <motion.div 
-                      className="h-full bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 background-animate"
-                      initial={{ width: "5%" }}
-                      animate={{ width: "95%" }}
-                      transition={{ 
-                        duration: 15, 
-                        ease: "easeInOut"
-                      }}
-                    />
-                  </div>
-                  
-                  <motion.div 
-                    className="absolute -top-1 -ml-1.5"
-                    initial={{ left: "5%" }}
-                    animate={{ left: "95%" }}
-                    transition={{ 
-                      duration: 15, 
-                      ease: "easeInOut" 
-                    }}
-                  >
-                    <div className="h-3.5 w-3.5 rounded-full bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.9)]"></div>
-                  </motion.div>
-                </div>
-                
-                <div className="flex justify-center gap-8 mt-8">
-                  <motion.div 
-                    className="flex flex-col items-center"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.5 }}
-                  >
-                    <div className="p-2 bg-indigo-900/30 rounded-lg mb-2">
-                      <FaLightbulb className="h-5 w-5 text-indigo-400" />
-                    </div>
-                    <p className="text-xs text-gray-400">Analyzing field</p>
-                  </motion.div>
-                  
-                  <motion.div 
-                    className="flex flex-col items-center"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 1.5 }}
-                  >
-                    <div className="p-2 bg-purple-900/30 rounded-lg mb-2">
-                      <FaBrain className="h-5 w-5 text-purple-400" />
-                    </div>
-                    <p className="text-xs text-gray-400">Creating path</p>
-                  </motion.div>
-                  
-                  <motion.div 
-                    className="flex flex-col items-center"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 2.5 }}
-                  >
-                    <div className="p-2 bg-blue-900/30 rounded-lg mb-2">
-                      <FaRocket className="h-5 w-5 text-blue-400" />
-                    </div>
-                    <p className="text-xs text-gray-400">Finalizing</p>
-                  </motion.div>
-                </div>
-              </motion.div>
-            </AnimatePresence>
+              </div>
+            </div>
+          </div>
         ) : (
-            <AnimatePresence>
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="grid gap-5 py-4 max-h-[60vh] overflow-y-auto pr-2"
-              >
-                {/* Career Information */}
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                >
-                  <motion.div 
-                    className="space-y-1 mb-4"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 }}
-                  >
-                    <Label htmlFor="title" className="text-gray-200 flex items-center gap-2">
-                      <FaGraduationCap className="text-indigo-400 h-4 w-4" />
-                      <span className="text-sm font-medium">Career Title</span>
-                      <span className="text-indigo-400 text-xs bg-indigo-900/20 px-2 py-0.5 rounded">Required</span>
-                    </Label>
-                    <Input
-                      id="title"
-                      placeholder="e.g., Frontend Developer, Data Scientist, DevOps Engineer"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      required
-                      className="bg-gray-800/70 border-gray-700 text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    />
-                    <p className="text-xs text-gray-400">Specify the professional role or field for which you&apos;d like a development plan</p>
-                  </motion.div>
-                  
-                  <motion.div 
-                    className="space-y-1 mb-2"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
-                  >
-                    <Label htmlFor="description" className="text-gray-200 flex items-center gap-2">
-                      <FaClipboardList className="text-indigo-400 h-4 w-4" />
-                      <span className="text-sm font-medium">Career Goals</span>
-                    </Label>
-                    <Textarea
-                      id="description"
-                      placeholder="Describe your specific goals, particular interests, or any preferences for this learning path..."
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      className="min-h-[120px] bg-gray-800/70 border-gray-700 text-white resize-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    />
-                  </motion.div>
-                  
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4 }}
-                    className="bg-gray-800/30 rounded-lg p-4 border border-gray-700/50 mt-6"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="bg-indigo-900/30 p-2 rounded-lg mt-0.5">
-                        <FaRegLightbulb className="h-5 w-5 text-indigo-400" />
-                      </div>
-                      <div>
-                        <h4 className="text-gray-200 text-sm font-medium mb-1">Tip for a better roadmap</h4>
-                        <p className="text-gray-400 text-sm">Add as many details as possible about what you want to learn and your specific objectives to receive a more relevant and personalized roadmap.</p>
-                      </div>
-                    </div>
-                  </motion.div>
-                </motion.div>
-              </motion.div>
-            </AnimatePresence>
-        )}
-        </div>
+          <div className="space-y-6 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="career-title" className="text-white">Career Title</Label>
+              <Input
+                id="career-title"
+                placeholder="e.g., Frontend Developer, Data Scientist"
+                value={careerTitle}
+                onChange={(e) => setCareerTitle(e.target.value)}
+                className="bg-gray-800 border-gray-700 text-white"
+              />
+            </div>
 
-        <DialogFooter className="bg-gray-900/90 p-6 border-t border-gray-800/50">
-          {isLoading ? (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-sm text-gray-400"
-            >
-              This process may take up to a minute...
-            </motion.div>
-          ) : (
-            <>
-              <Button 
-                variant="outline" 
-                onClick={handleClose} 
-                className="bg-transparent text-gray-300 border-gray-700 hover:bg-gray-800 hover:text-white"
+            <div className="space-y-2">
+              <Label htmlFor="description" className="text-white">Additional Context (Optional)</Label>
+              <Textarea
+                id="description"
+                placeholder="Add any specific details about the career path, goals, or requirements..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="min-h-[100px] bg-gray-800 border-gray-700 text-white"
+              />
+              <p className="text-sm text-gray-400">
+                The more detailed your description, the more accurate the AI-generated roadmap will be.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="skills" className="text-white">Required Skills</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="skills"
+                  placeholder="Add required skills (press Enter)"
+                  value={newSkill}
+                  onChange={(e) => setNewSkill(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  className="bg-gray-800 border-gray-700 text-white"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={handleAddSkill}
+                  className="border-gray-700 hover:bg-gray-700"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {skills.map((skill) => (
+                  <Badge
+                    key={skill}
+                    variant="secondary"
+                    className="bg-gray-800 text-white hover:bg-gray-700"
+                  >
+                    {skill}
+                    <button
+                      onClick={() => handleRemoveSkill(skill)}
+                      className="ml-1 hover:text-red-400"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-4 pt-4">
+              <Button
+                variant="outline"
+                onClick={onClose}
+                className="border-gray-700 hover:bg-gray-700"
               >
                 Cancel
               </Button>
-              <Button 
-                onClick={handleGenerate}
-                disabled={!title}
-                className={`${
-                  !title
-                    ? "bg-indigo-800/30 text-indigo-300 cursor-not-allowed"
-                    : "bg-gradient-to-r from-indigo-700 to-purple-700 hover:from-indigo-800 hover:to-purple-800 text-white shadow-lg shadow-indigo-900/20"
-                } font-medium transition-all duration-200`}
+              <Button
+                onClick={generateRoadmap}
+                disabled={!careerTitle.trim() || isGenerating}
+                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white"
               >
-                <FaCode className="mr-2" />
-                Generate Roadmap
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Generate Roadmap
+                  </>
+                )}
               </Button>
-            </>
-          )}
-        </DialogFooter>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
-};
-
-export default CareerCreationModal; 
+} 

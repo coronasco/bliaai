@@ -1,6 +1,7 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
+import { initializeApp, getApps } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore, collection, getDocs, query, limit } from "firebase/firestore";
+import { getFirestore, collection, getDocs, query, limit, connectFirestoreEmulator } from "firebase/firestore";
+import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 import { getAnalytics } from "firebase/analytics";
 
 const firebaseConfig = {
@@ -13,10 +14,28 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-// Inițializează Firebase
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+console.log("[DEBUG FIREBASE] Initializing Firebase with config:", {
+  projectId: firebaseConfig.projectId,
+  hasApiKey: !!firebaseConfig.apiKey,
+  hasAuthDomain: !!firebaseConfig.authDomain
+});
+
+// Initialize Firebase if it hasn't been initialized yet
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
 const auth = getAuth(app);
 const db = getFirestore(app);
+const functions = getFunctions(app);
+
+// Log successful initialization
+console.log("[DEBUG FIREBASE] Firebase initialized successfully");
+
+// Check if we're running in development mode and need to connect to emulators
+if (process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === 'true') {
+  console.log("[DEBUG FIREBASE] Connecting to Firestore emulator");
+  connectFirestoreEmulator(db, 'localhost', 8080);
+  connectFunctionsEmulator(functions, 'localhost', 5001);
+  console.log("[DEBUG FIREBASE] Connected to Firebase emulators");
+}
 
 // Inițializează Analytics doar în browser
 let analytics = null;
@@ -42,4 +61,4 @@ export async function checkKnowledgeBaseAccess() {
   }
 }
 
-export { app, auth, db, analytics };
+export { app, auth, db, functions, analytics };

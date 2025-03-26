@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
-import { FaBug, FaBook, FaUsers, FaCreditCard } from "react-icons/fa";
+import { FaBug, FaBook, FaUsers, FaCreditCard, FaRoad } from "react-icons/fa";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -95,6 +95,12 @@ export default function AdminDashboardPage() {
       description: "Manage users and their roles.",
       href: "/admin/users",
       icon: <FaUsers className="text-2xl text-green-500" />,
+    },
+    {
+      title: "Roadmaps",
+      description: "Manage official learning roadmaps for users.",
+      href: "/admin/roadmaps",
+      icon: <FaRoad className="text-2xl text-yellow-500" />,
     },
     {
       title: "Subscriptions",
